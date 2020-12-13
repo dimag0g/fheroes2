@@ -299,7 +299,7 @@ namespace
                     }
                 }
 
-                filteredResolutions = FilterResolutions( resolutionSet );
+                //!filteredResolutions = FilterResolutions( resolutionSet );
             }
 
             return filteredResolutions;
@@ -641,7 +641,7 @@ namespace
                     }
                 }
 
-                filteredResolutions = FilterResolutions( resolutionSet );
+                //!filteredResolutions = FilterResolutions( resolutionSet );
             }
 
             return filteredResolutions;

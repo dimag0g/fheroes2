@@ -273,6 +273,12 @@ private:
     void HandleMouseMotionEvent( const SDL_MouseMotionEvent & );
     void HandleMouseButtonEvent( const SDL_MouseButtonEvent & );
     void HandleKeyboardEvent( SDL_KeyboardEvent & );
+#if defined(__SWITCH__)
+    void HandleJoyAxisEvent(const SDL_JoyAxisEvent & motion);
+    void HandleJoyButtonEvent(const SDL_JoyButtonEvent & button);
+    void HandleTouchEvent(const SDL_TouchFingerEvent & event);
+    void ProcessAxisMotion(void);
+#endif
 
 #if SDL_VERSION_ATLEAST( 2, 0, 0 )
     void HandleMouseWheelEvent( const SDL_MouseWheelEvent & );
@@ -341,6 +347,11 @@ private:
     KeySym emulate_press_left;
     KeySym emulate_press_right;
 #endif
+#if defined(__SWITCH__)
+    int         vita_pointer_speed = 10;
+    int         vita_touchcontrol_type = 1;
+    int         vita_touchcontrol_speed = 15;
+#endif	
 };
 
 #endif

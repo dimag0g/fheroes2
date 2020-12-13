@@ -38,6 +38,7 @@
 
 bool IS_DEBUG( int name, int level )
 {
+	return !(DBG_DEVEL & name); //!
     const int debug = Settings::Get().Debug();
     return ( ( DBG_ENGINE & name ) && ( ( DBG_ENGINE & debug ) >> 2 ) >= level ) || ( ( DBG_GAME & name ) && ( ( DBG_GAME & debug ) >> 4 ) >= level )
            || ( ( DBG_BATTLE & name ) && ( ( DBG_BATTLE & debug ) >> 6 ) >= level ) || ( ( DBG_AI & name ) && ( ( DBG_AI & debug ) >> 8 ) >= level )
@@ -973,9 +974,7 @@ ListDirs Settings::GetRootDirs( void )
     ListDirs dirs;
 
     // from build
-#ifdef CONFIGURE_FHEROES2_DATA
-    dirs.push_back( CONFIGURE_FHEROES2_DATA );
-#endif
+    dirs.push_back( "/switch/fheroes2" );
 
     // from env
     if ( System::GetEnvironment( "FHEROES2_DATA" ) )

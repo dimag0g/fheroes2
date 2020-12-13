@@ -44,9 +44,11 @@ namespace std
         __android_log_print( ANDROID_LOG_INFO, "SDLHeroes2", "%s", osss.str().c_str() );                                                                                 \
     }
 #else
+#include <fstream> //!
+extern std::ofstream *log_file;
 #define COUT( x )                                                                                                                                                        \
     {                                                                                                                                                                    \
-        std::cerr << x << std::endl;                                                                                                                                     \
+        *log_file << x << std::endl; log_file->flush();                                                                                                                                \
     }
 #endif
 

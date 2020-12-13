@@ -29,6 +29,36 @@
 
 #define TAP_DELAY_EMULATE 1050
 
+#ifdef __SWITCH__
+#define JOY_DEADZONE 1000
+#define JOY_ANALOG
+#define JOY_XAXIS 0
+#define JOY_YAXIS 1
+#define JOY_XAXISR 2
+#define JOY_YAXISR 3
+
+
+enum {
+	BTN_LEFT		= 12,
+	BTN_DOWN		= 15,
+	BTN_RIGHT		= 14,
+	BTN_UP			= 1,
+
+	BTN_MINUS		= 10,
+	BTN_PLUS		= 11,
+
+	BTN_Y			= 3,
+	BTN_X			= 2,
+	BTN_B			= 1,
+	BTN_A			= 0,
+
+	BTN_R			= 8,
+	BTN_L			= 9
+};
+
+Uint32 lastTime = 0;
+#endif
+
 LocalEvent::LocalEvent()
     : modes( 0 )
     , key_value( KEY_NONE )
@@ -44,7 +74,7 @@ LocalEvent::LocalEvent()
     , _isSoundPaused( false )
 {
 #ifdef WITHOUT_MOUSE
-    emulate_mouse = false;
+    emulate_mouse = true; //!
     emulate_mouse_up = KEY_UP;
     emulate_mouse_down = KEY_DOWN;
     emulate_mouse_left = KEY_LEFT;
@@ -547,6 +577,21 @@ bool LocalEvent::HandleEvents( bool delay, bool allowExit )
             }
             break;
 #endif
+#if defined(__SWITCH__)
+            case SDL_JOYAXISMOTION:
+                HandleJoyAxisEvent(event.jaxis);
+                break;
+            case SDL_JOYBUTTONDOWN:
+            case SDL_JOYBUTTONUP:
+                HandleJoyButtonEvent(event.jbutton);
+                break;   
+            case SDL_FINGERDOWN:
+					   
+            case SDL_FINGERUP:
+            case SDL_FINGERMOTION:
+                HandleTouchEvent(event.tfinger);
+                break;
+#endif
         // keyboard
         case SDL_KEYDOWN:
         case SDL_KEYUP:
@@ -605,12 +650,300 @@ bool LocalEvent::HandleEvents( bool delay, bool allowExit )
         }
     }
 
+#ifdef __SWITCH__
+    ProcessAxisMotion();
+#endif
     if ( delay )
         SDL_Delay( loop_delay );
 
     return true;
 }
+#if defined(VITA) || defined(__SWITCH__)
+Sint16 xaxis_value = 0;
+Sint16 yaxis_value = 0;
+float xaxis_float = 0;
+float yaxis_float = 0;
+float xaxis_starting = 0;
+float yaxis_starting = 0;
+float xcursor_starting = 0;
+float ycursor_starting = 0;
+bool secondTouchDown = false;
 
+void LocalEvent::HandleTouchEvent(const SDL_TouchFingerEvent & event)
+{
+    if(event.touchId != 0 || vita_touchcontrol_type == 0)
+        return;
+    
+    //doesn't really work at this point..
+    if(event.fingerId == 1)
+    {
+        if (event.type == SDL_FINGERDOWN)
+            secondTouchDown = true;
+        else if (event.type == SDL_FINGERUP)
+            secondTouchDown = false;
+        return;
+    }
+        
+    if (event.type == SDL_FINGERDOWN)
+    {
+        xaxis_starting = event.x * (float)960;
+        yaxis_starting = event.y * (float)544;
+        xcursor_starting = xaxis_float;
+        ycursor_starting = yaxis_float;
+    }
+    
+    SetModes(MOUSE_MOTION);
+    
+    if (vita_touchcontrol_type == 1)
+    {
+        int w = 960;
+        int h = 544;
+        
+        //fullscreen touch location fix
+        {
+            w = fheroes2::Display::instance().width();
+            h = fheroes2::Display::instance().height();
+        }
+        
+        xaxis_float = event.x * (float)w;
+        yaxis_float = event.y * (float)h;
+    }
+    else if (vita_touchcontrol_type == 2)
+    {
+        float deltaX = ((event.x * (float)960) - xaxis_starting) * (vita_touchcontrol_speed / 10.0f);
+        float deltaY = ((event.y * (float)544) - yaxis_starting) * (vita_touchcontrol_speed / 10.0f);
+        xaxis_float = xcursor_starting + deltaX;
+        yaxis_float = ycursor_starting + deltaY;
+    }
+    
+    if(xaxis_float < 0) xaxis_float = 0;
+    if(yaxis_float < 0) yaxis_float = 0;
+    if(xaxis_float > fheroes2::Display::instance().width()) xaxis_float = fheroes2::Display::instance().width();
+    if(yaxis_float > fheroes2::Display::instance().height()) yaxis_float = fheroes2::Display::instance().height();
+
+    mouse_cu.x = static_cast<s16>(xaxis_float);
+    mouse_cu.y = static_cast<s16>(yaxis_float);
+    
+    if((modes & MOUSE_MOTION) && redraw_cursor_func)
+    {
+        if(modes & MOUSE_OFFSET)
+            (*(redraw_cursor_func))(mouse_cu.x + mouse_st.x, mouse_cu.y + mouse_st.y);
+        else
+            (*(redraw_cursor_func))(mouse_cu.x, mouse_cu.y);
+    }
+    
+    if(!secondTouchDown)
+    {
+	if(event.type == SDL_FINGERDOWN)
+	{
+            mouse_pl = mouse_cu;
+            SetModes(MOUSE_PRESSED);
+            SetModes(CLICK_LEFT);
+	}
+	else if(event.type == SDL_FINGERUP)
+	{
+            mouse_rl = mouse_cu;
+            ResetModes(MOUSE_PRESSED);
+        }
+	    mouse_button = SDL_BUTTON_LEFT;
+    }
+    else
+    {
+        if(event.type == SDL_FINGERDOWN)
+        {
+            mouse_pr = mouse_cu;
+            SetModes(MOUSE_PRESSED);
+        }
+        else if(event.type == SDL_FINGERUP)
+        {
+            mouse_rr = mouse_cu;
+            ResetModes(MOUSE_PRESSED);
+        }
+	    mouse_button = SDL_BUTTON_RIGHT;
+    }
+}
+
+void LocalEvent::HandleJoyAxisEvent(const SDL_JoyAxisEvent & motion)
+{
+    if (motion.axis == JOY_XAXIS)
+    {
+        if(std::abs(motion.value) > JOY_DEADZONE)
+            xaxis_value = motion.value;
+        else
+            xaxis_value = 0;
+    }
+    else if (motion.axis == JOY_YAXIS)
+    {
+        if(std::abs(motion.value) > JOY_DEADZONE)
+            yaxis_value = motion.value;
+        else
+            yaxis_value = 0;
+    }
+}
+#endif
+
+#if defined(VITA)
+void LocalEvent::HandleJoyButtonEvent(const SDL_JoyButtonEvent & button)
+{
+    if (button.state == SDL_PRESSED)
+        SetModes(KEY_PRESSED);
+    else if (button.state == SDL_RELEASED)
+        ResetModes(KEY_PRESSED);
+    
+    if(button.button == BTN_CROSS)
+    {
+	if(modes & KEY_PRESSED)
+	{
+            mouse_pl = mouse_cu;
+            SetModes(MOUSE_PRESSED);
+            SetModes(CLICK_LEFT);
+	}
+	else
+	{
+            mouse_rl = mouse_cu;
+            ResetModes(MOUSE_PRESSED);
+        }
+	    mouse_button = SDL_BUTTON_LEFT;
+            
+        ResetModes(KEY_PRESSED);
+    }
+    else if(button.button == BTN_CIRCLE)
+    {
+        if(modes & KEY_PRESSED)
+        {
+            mouse_pr = mouse_cu;
+            SetModes(MOUSE_PRESSED);
+        }
+        else
+        {
+            mouse_rr = mouse_cu;
+            ResetModes(MOUSE_PRESSED);
+        }
+	    mouse_button = SDL_BUTTON_RIGHT;
+            
+        ResetModes(KEY_PRESSED);
+    }
+    else if(modes & KEY_PRESSED)
+    {
+        if(button.button == BTN_LEFT)
+        {
+            key_value = KEY_KP4;
+        }
+        else if(button.button == BTN_RIGHT)
+        {
+            key_value = KEY_KP6;
+        }
+        else if(button.button == BTN_UP)
+        {
+            key_value = KEY_KP8;
+        }
+        else if(button.button == BTN_DOWN)
+        {
+            key_value = KEY_KP2;
+        }
+    }
+}
+#elif defined(__SWITCH__)
+void LocalEvent::HandleJoyButtonEvent(const SDL_JoyButtonEvent & button)
+{
+    if(button.button == BTN_A)
+    {
+	if(button.state == SDL_PRESSED)
+	{
+            mouse_pl = mouse_cu;
+            SetModes(MOUSE_PRESSED);
+            SetModes(CLICK_LEFT);
+	}
+	else
+	{
+            mouse_rl = mouse_cu;
+            ResetModes(MOUSE_PRESSED);
+        }
+	    mouse_button = SDL_BUTTON_LEFT;
+            
+        ResetModes(KEY_PRESSED);
+    }
+    else if(button.button == BTN_B)
+    {
+        if(button.state == SDL_PRESSED)
+        {
+            mouse_pr = mouse_cu;
+            SetModes(MOUSE_PRESSED);
+        }
+        else
+        {
+            mouse_rr = mouse_cu;
+            ResetModes(MOUSE_PRESSED);
+        }
+	    mouse_button = SDL_BUTTON_RIGHT;
+            
+        ResetModes(KEY_PRESSED);
+    }
+    else if(button.state == SDL_PRESSED)
+    {
+        if(button.button == BTN_LEFT)
+        {
+            key_value = KEY_LEFT;
+        }
+        else if(button.button == BTN_RIGHT)
+        {
+            key_value = KEY_RIGHT;
+        }
+        else if(button.button == BTN_UP)
+        {
+            key_value = KEY_UP;
+        }
+        else if(button.button == BTN_DOWN)
+        {
+            key_value = KEY_DOWN;
+        }
+        else if(button.button == BTN_X)
+        {
+            key_value = KEY_ESCAPE;
+        }
+        else if(button.button == BTN_Y)
+        {
+            key_value = KEY_RETURN;
+        }
+    }
+}
+#endif
+
+#if defined(VITA) || defined(__SWITCH__)
+void LocalEvent::ProcessAxisMotion()
+{
+    float movementSpeed = 8192 * 20;
+    float settingsSpeedMod = static_cast<float>(vita_pointer_speed) / 10.0f;
+    
+    Uint32 currentTime = SDL_GetTicks();
+    float deltaTime = currentTime - lastTime;
+    lastTime = currentTime;
+    
+    if (xaxis_value == 0 && yaxis_value == 0)
+        return;
+    
+    SetModes(MOUSE_MOTION);
+    
+    xaxis_float += ((pow(abs(xaxis_value), 1.03f) * (xaxis_value / abs(xaxis_value)) * deltaTime) / movementSpeed) * settingsSpeedMod;
+    yaxis_float += ((pow(abs(yaxis_value), 1.03f) * (yaxis_value / abs(yaxis_value)) * deltaTime) / movementSpeed) * settingsSpeedMod;
+    
+    if(xaxis_float < 0) xaxis_float = 0;
+    if(yaxis_float < 0) yaxis_float = 0;
+    if(xaxis_float > fheroes2::Display::instance().width()) xaxis_float = fheroes2::Display::instance().width();
+    if(yaxis_float > fheroes2::Display::instance().height()) yaxis_float = fheroes2::Display::instance().height();
+    
+    mouse_cu.x = static_cast<s16>(xaxis_float);
+    mouse_cu.y = static_cast<s16>(yaxis_float);
+    
+    if((modes & MOUSE_MOTION) && redraw_cursor_func)
+    {
+        if(modes & MOUSE_OFFSET)
+            (*(redraw_cursor_func))(mouse_cu.x + mouse_st.x, mouse_cu.y + mouse_st.y);
+        else
+            (*(redraw_cursor_func))(mouse_cu.x, mouse_cu.y);
+    }
+}
+#endif
 bool LocalEvent::MouseMotion( void ) const
 {
     return ( modes & MOUSE_MOTION ) == MOUSE_MOTION;
@@ -1013,11 +1346,21 @@ void LocalEvent::SetStateDefaults( void )
     SetState( SDL_MOUSEBUTTONUP, true );
     SetState( SDL_QUIT, true );
 
-    SetState( SDL_JOYAXISMOTION, false );
-    SetState( SDL_JOYBALLMOTION, false );
-    SetState( SDL_JOYHATMOTION, false );
-    SetState( SDL_JOYBUTTONUP, false );
-    SetState( SDL_JOYBUTTONDOWN, false );
+#if defined(__SWITCH__)
+    SetState(SDL_JOYAXISMOTION, true);
+    SetState(SDL_JOYBUTTONUP, true);
+    SetState(SDL_JOYBUTTONDOWN, true);
+    SetState(SDL_FINGERMOTION, true);
+    SetState(SDL_FINGERDOWN, true);
+    SetState(SDL_FINGERUP, true);
+#else
+    SetState(SDL_JOYAXISMOTION, false);
+    SetState(SDL_JOYBUTTONUP, false);
+    SetState(SDL_JOYBUTTONDOWN, false);
+#endif
+    
+    SetState(SDL_JOYBALLMOTION, false);
+    SetState(SDL_JOYHATMOTION, false);
     SetState( SDL_SYSWMEVENT, false );
 
 #if SDL_VERSION_ATLEAST( 2, 0, 0 )

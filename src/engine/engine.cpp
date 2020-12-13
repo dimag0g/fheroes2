@@ -47,6 +47,12 @@ bool SDL::Init( const u32 system )
         ERROR( SDL_GetError() );
         return false;
     }
+	
+#ifdef __SWITCH__
+    SDL_InitSubSystem(SDL_INIT_JOYSTICK);
+    SDL_JoystickEventState(SDL_ENABLE);
+    SDL_JoystickOpen(0);
+#endif
 
     if ( SDL_INIT_AUDIO & system )
         Mixer::Init();
