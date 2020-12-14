@@ -34,7 +34,7 @@ In the end you should have the following directory tree on your SD card:
      +-- fheroes2  <--- this is the game directory
          |
          +--- anim
-		 +--- data
+         +--- data
          +--- files
          +--- maps
          +--- music
