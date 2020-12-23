@@ -146,7 +146,7 @@ int main( int argc, char ** argv )
             display.resize( conf.VideoMode().w, conf.VideoMode().h );
             fheroes2::engine().setTitle( GetCaption() );
 
-            //!SDL_ShowCursor( SDL_DISABLE ); // hide system cursor
+            SDL_ShowCursor( SDL_DISABLE ); // hide system cursor
 
             // Ensure the mouse position is updated to prevent bad initial values.
             LocalEvent::Get().RegisterCycling();

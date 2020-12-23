@@ -30,13 +30,11 @@
 #define TAP_DELAY_EMULATE 1050
 
 #ifdef __SWITCH__
-#define JOY_DEADZONE 1000
-#define JOY_ANALOG
+#define JOY_DEADZONE 100
 #define JOY_XAXIS 0
 #define JOY_YAXIS 1
 #define JOY_XAXISR 2
 #define JOY_YAXISR 3
-
 
 enum {
 	BTN_LEFT		= 12,
@@ -586,7 +584,6 @@ bool LocalEvent::HandleEvents( bool delay, bool allowExit )
                 HandleJoyButtonEvent(event.jbutton);
                 break;   
             case SDL_FINGERDOWN:
-					   
             case SDL_FINGERUP:
             case SDL_FINGERMOTION:
                 HandleTouchEvent(event.tfinger);
@@ -658,71 +655,16 @@ bool LocalEvent::HandleEvents( bool delay, bool allowExit )
 
     return true;
 }
-#if defined(VITA) || defined(__SWITCH__)
+#if defined(__SWITCH__)
 Sint16 xaxis_value = 0;
 Sint16 yaxis_value = 0;
-float xaxis_float = 0;
-float yaxis_float = 0;
-float xaxis_starting = 0;
-float yaxis_starting = 0;
-float xcursor_starting = 0;
-float ycursor_starting = 0;
-bool secondTouchDown = false;
 
 void LocalEvent::HandleTouchEvent(const SDL_TouchFingerEvent & event)
 {
-    if(event.touchId != 0 || vita_touchcontrol_type == 0)
-        return;
-    
-    //doesn't really work at this point..
-    if(event.fingerId == 1)
-    {
-        if (event.type == SDL_FINGERDOWN)
-            secondTouchDown = true;
-        else if (event.type == SDL_FINGERUP)
-            secondTouchDown = false;
-        return;
-    }
-        
-    if (event.type == SDL_FINGERDOWN)
-    {
-        xaxis_starting = event.x * (float)960;
-        yaxis_starting = event.y * (float)544;
-        xcursor_starting = xaxis_float;
-        ycursor_starting = yaxis_float;
-    }
-    
     SetModes(MOUSE_MOTION);
     
-    if (vita_touchcontrol_type == 1)
-    {
-        int w = 960;
-        int h = 544;
-        
-        //fullscreen touch location fix
-        {
-            w = fheroes2::Display::instance().width();
-            h = fheroes2::Display::instance().height();
-        }
-        
-        xaxis_float = event.x * (float)w;
-        yaxis_float = event.y * (float)h;
-    }
-    else if (vita_touchcontrol_type == 2)
-    {
-        float deltaX = ((event.x * (float)960) - xaxis_starting) * (vita_touchcontrol_speed / 10.0f);
-        float deltaY = ((event.y * (float)544) - yaxis_starting) * (vita_touchcontrol_speed / 10.0f);
-        xaxis_float = xcursor_starting + deltaX;
-        yaxis_float = ycursor_starting + deltaY;
-    }
-    
-    if(xaxis_float < 0) xaxis_float = 0;
-    if(yaxis_float < 0) yaxis_float = 0;
-    if(xaxis_float > fheroes2::Display::instance().width()) xaxis_float = fheroes2::Display::instance().width();
-    if(yaxis_float > fheroes2::Display::instance().height()) yaxis_float = fheroes2::Display::instance().height();
-
-    mouse_cu.x = static_cast<s16>(xaxis_float);
-    mouse_cu.y = static_cast<s16>(yaxis_float);
+    mouse_cu.x = static_cast<s16>(event.x * fheroes2::Display::instance().width());
+    mouse_cu.y = static_cast<s16>(event.y * fheroes2::Display::instance().height());
     
     if((modes & MOUSE_MOTION) && redraw_cursor_func)
     {
@@ -732,35 +674,22 @@ void LocalEvent::HandleTouchEvent(const SDL_TouchFingerEvent & event)
             (*(redraw_cursor_func))(mouse_cu.x, mouse_cu.y);
     }
     
-    if(!secondTouchDown)
+    //if(!secondTouchDown)
     {
-	if(event.type == SDL_FINGERDOWN)
-	{
-            mouse_pl = mouse_cu;
-            SetModes(MOUSE_PRESSED);
-            SetModes(CLICK_LEFT);
+		if(event.type == SDL_FINGERDOWN)
+		{
+			mouse_pl = mouse_cu;
+			SetModes(MOUSE_PRESSED);
+			SetModes(CLICK_LEFT);
+		}
+		else if(event.type == SDL_FINGERUP)
+		{
+			mouse_rl = mouse_cu;
+			ResetModes(MOUSE_PRESSED);
+		}
+		mouse_button = SDL_BUTTON_LEFT;
 	}
-	else if(event.type == SDL_FINGERUP)
-	{
-            mouse_rl = mouse_cu;
-            ResetModes(MOUSE_PRESSED);
-        }
-	    mouse_button = SDL_BUTTON_LEFT;
-    }
-    else
-    {
-        if(event.type == SDL_FINGERDOWN)
-        {
-            mouse_pr = mouse_cu;
-            SetModes(MOUSE_PRESSED);
-        }
-        else if(event.type == SDL_FINGERUP)
-        {
-            mouse_rr = mouse_cu;
-            ResetModes(MOUSE_PRESSED);
-        }
-	    mouse_button = SDL_BUTTON_RIGHT;
-    }
+
 }
 
 void LocalEvent::HandleJoyAxisEvent(const SDL_JoyAxisEvent & motion)
@@ -780,89 +709,25 @@ void LocalEvent::HandleJoyAxisEvent(const SDL_JoyAxisEvent & motion)
             yaxis_value = 0;
     }
 }
-#endif
 
-#if defined(VITA)
-void LocalEvent::HandleJoyButtonEvent(const SDL_JoyButtonEvent & button)
-{
-    if (button.state == SDL_PRESSED)
-        SetModes(KEY_PRESSED);
-    else if (button.state == SDL_RELEASED)
-        ResetModes(KEY_PRESSED);
-    
-    if(button.button == BTN_CROSS)
-    {
-	if(modes & KEY_PRESSED)
-	{
-            mouse_pl = mouse_cu;
-            SetModes(MOUSE_PRESSED);
-            SetModes(CLICK_LEFT);
-	}
-	else
-	{
-            mouse_rl = mouse_cu;
-            ResetModes(MOUSE_PRESSED);
-        }
-	    mouse_button = SDL_BUTTON_LEFT;
-            
-        ResetModes(KEY_PRESSED);
-    }
-    else if(button.button == BTN_CIRCLE)
-    {
-        if(modes & KEY_PRESSED)
-        {
-            mouse_pr = mouse_cu;
-            SetModes(MOUSE_PRESSED);
-        }
-        else
-        {
-            mouse_rr = mouse_cu;
-            ResetModes(MOUSE_PRESSED);
-        }
-	    mouse_button = SDL_BUTTON_RIGHT;
-            
-        ResetModes(KEY_PRESSED);
-    }
-    else if(modes & KEY_PRESSED)
-    {
-        if(button.button == BTN_LEFT)
-        {
-            key_value = KEY_KP4;
-        }
-        else if(button.button == BTN_RIGHT)
-        {
-            key_value = KEY_KP6;
-        }
-        else if(button.button == BTN_UP)
-        {
-            key_value = KEY_KP8;
-        }
-        else if(button.button == BTN_DOWN)
-        {
-            key_value = KEY_KP2;
-        }
-    }
-}
-#elif defined(__SWITCH__)
 void LocalEvent::HandleJoyButtonEvent(const SDL_JoyButtonEvent & button)
 {
     if(button.button == BTN_A)
     {
-	if(button.state == SDL_PRESSED)
-	{
-            mouse_pl = mouse_cu;
-            SetModes(MOUSE_PRESSED);
-            SetModes(CLICK_LEFT);
+		if(button.state == SDL_PRESSED)
+		{
+			mouse_pl = mouse_cu;
+			SetModes(MOUSE_PRESSED);
+			SetModes(CLICK_LEFT);
+		}
+		else
+		{
+			mouse_rl = mouse_cu;
+			ResetModes(MOUSE_PRESSED);
+		}
+		mouse_button = SDL_BUTTON_LEFT;
+		ResetModes(KEY_PRESSED);
 	}
-	else
-	{
-            mouse_rl = mouse_cu;
-            ResetModes(MOUSE_PRESSED);
-        }
-	    mouse_button = SDL_BUTTON_LEFT;
-            
-        ResetModes(KEY_PRESSED);
-    }
     else if(button.button == BTN_B)
     {
         if(button.state == SDL_PRESSED)
@@ -879,61 +744,56 @@ void LocalEvent::HandleJoyButtonEvent(const SDL_JoyButtonEvent & button)
             
         ResetModes(KEY_PRESSED);
     }
-    else if(button.state == SDL_PRESSED)
+    else if(button.button == BTN_X)
     {
-        if(button.button == BTN_LEFT)
-        {
-            key_value = KEY_LEFT;
-        }
-        else if(button.button == BTN_RIGHT)
-        {
-            key_value = KEY_RIGHT;
-        }
-        else if(button.button == BTN_UP)
-        {
-            key_value = KEY_UP;
-        }
-        else if(button.button == BTN_DOWN)
-        {
-            key_value = KEY_DOWN;
-        }
-        else if(button.button == BTN_X)
+        if(button.state == SDL_PRESSED)
         {
             key_value = KEY_ESCAPE;
+			SetModes( KEY_PRESSED );
+			SetModes( KEY_HOLD );
         }
-        else if(button.button == BTN_Y)
+        else
+        {
+			key_value = KEY_NONE;
+			ResetModes( KEY_PRESSED );
+			ResetModes( KEY_HOLD );
+        }
+    }
+    else if(button.button == BTN_Y)
+    {
+        if(button.state == SDL_PRESSED)
         {
             key_value = KEY_RETURN;
+			SetModes( KEY_PRESSED );
+			SetModes( KEY_HOLD );
+        }
+        else
+        {
+			key_value = KEY_NONE;
+			ResetModes( KEY_PRESSED );
+			ResetModes( KEY_HOLD );
         }
     }
 }
-#endif
 
-#if defined(VITA) || defined(__SWITCH__)
 void LocalEvent::ProcessAxisMotion()
 {
-    float movementSpeed = 8192 * 20;
-    float settingsSpeedMod = static_cast<float>(vita_pointer_speed) / 10.0f;
-    
-    Uint32 currentTime = SDL_GetTicks();
-    float deltaTime = currentTime - lastTime;
-    lastTime = currentTime;
-    
-    if (xaxis_value == 0 && yaxis_value == 0)
-        return;
+    float settingsSpeedMod = pointer_speed/20000.0f;
     
     SetModes(MOUSE_MOTION);
     
-    xaxis_float += ((pow(abs(xaxis_value), 1.03f) * (xaxis_value / abs(xaxis_value)) * deltaTime) / movementSpeed) * settingsSpeedMod;
-    yaxis_float += ((pow(abs(yaxis_value), 1.03f) * (yaxis_value / abs(yaxis_value)) * deltaTime) / movementSpeed) * settingsSpeedMod;
+    //xaxis_float += ((pow(abs(xaxis_value), 1.03f) * (xaxis_value / abs(xaxis_value)) * deltaTime)) * settingsSpeedMod;
+    //yaxis_float += ((pow(abs(yaxis_value), 1.03f) * (yaxis_value / abs(yaxis_value)) * deltaTime)) * settingsSpeedMod;
+	
+	float accel_factor = std::min(std::abs(xaxis_value)+std::abs(yaxis_value)+10000.0f / 10000.0f, 3.0f);
+	
+    mouse_cu.x += static_cast<s16>(xaxis_value * accel_factor * settingsSpeedMod);
+    mouse_cu.y += static_cast<s16>(yaxis_value * accel_factor * settingsSpeedMod);
     
-    if(xaxis_float < 0) xaxis_float = 0;
-    if(yaxis_float < 0) yaxis_float = 0;
-    if(xaxis_float > fheroes2::Display::instance().width()) xaxis_float = fheroes2::Display::instance().width();
-    if(yaxis_float > fheroes2::Display::instance().height()) yaxis_float = fheroes2::Display::instance().height();
-    
-    mouse_cu.x = static_cast<s16>(xaxis_float);
-    mouse_cu.y = static_cast<s16>(yaxis_float);
+    if(mouse_cu.x < 0) mouse_cu.x = 0;
+    if(mouse_cu.y < 0) mouse_cu.y = 0;
+    if(mouse_cu.x >= fheroes2::Display::instance().width()) mouse_cu.x = fheroes2::Display::instance().width()-1;
+    if(mouse_cu.y >= fheroes2::Display::instance().height()) mouse_cu.y = fheroes2::Display::instance().height()-1;
     
     if((modes & MOUSE_MOTION) && redraw_cursor_func)
     {
@@ -944,6 +804,7 @@ void LocalEvent::ProcessAxisMotion()
     }
 }
 #endif
+
 bool LocalEvent::MouseMotion( void ) const
 {
     return ( modes & MOUSE_MOTION ) == MOUSE_MOTION;

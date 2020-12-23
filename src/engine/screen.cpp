@@ -114,7 +114,7 @@ namespace
 
 namespace
 {
-#if SDL_VERSION_ATLEAST( 2, 0, 0 )
+#if SDL_VERSION_ATLEAST( 2, 0, 0 ) && !defined(WITHOUT_MOUSE)
     class RenderCursor : public fheroes2::Cursor
     {
     public:
@@ -910,7 +910,7 @@ namespace fheroes2
 
     void Display::render()
     {
-        if ( _cursor->isVisible() && !_cursor->_image.empty() ) {
+        if (/* _cursor->isVisible() && !_cursor->_image.empty()*/1 ) {
             const Sprite & cursorImage = _cursor->_image;
             const Sprite backup = Crop( *this, cursorImage.x(), cursorImage.y(), cursorImage.width(), cursorImage.height() );
             Blit( cursorImage, *this, cursorImage.x(), cursorImage.y() );

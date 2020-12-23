@@ -52,6 +52,8 @@ Working controls controls are:
 - L-stick - move mouse cursor
 - A - left mouse click
 - B - Right mouse click
+- X - Escape
+- Y - Enter
 
 
 [4] TODO
@@ -59,7 +61,7 @@ Working controls controls are:
 
 Here's a list of known bugs / missing features, approximately in order of priority. Don't bother reporting those as issues.
 
-- cursor is invisible
+- videos have wrong aspect ratio
 - locales are not supported
 
 
@@ -67,7 +69,9 @@ The game icon was downloaded from [this page](https://iconarchive.com/show/mega-
 with the following copyright notice:
 
 >Artist: Exhumed
+
 >License: CC Attribution-Noncommercial-No Derivate 4.0
+
 >Commercial usage: Not allowed
 
 

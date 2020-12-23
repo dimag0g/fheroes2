@@ -348,9 +348,7 @@ private:
     KeySym emulate_press_right;
 #endif
 #if defined(__SWITCH__)
-    int         vita_pointer_speed = 10;
-    int         vita_touchcontrol_type = 1;
-    int         vita_touchcontrol_speed = 15;
+    float  pointer_speed = 2.0f;
 #endif	
 };
 
