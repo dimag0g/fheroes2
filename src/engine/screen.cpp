@@ -114,7 +114,7 @@ namespace
 
 namespace
 {
-#if SDL_VERSION_ATLEAST( 2, 0, 0 ) && !defined(WITHOUT_MOUSE)
+#if SDL_VERSION_ATLEAST( 2, 0, 0 ) && !defined( WITHOUT_MOUSE )
     class RenderCursor : public fheroes2::Cursor
     {
     public:
