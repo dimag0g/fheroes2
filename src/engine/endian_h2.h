@@ -1,8 +1,6 @@
 /***************************************************************************
- *   Copyright (C) 2009 by Andrey Afletdinov <fheroes2@gmail.com>          *
- *                                                                         *
- *   Part of the Free Heroes2 Engine:                                      *
- *   http://sourceforge.net/projects/fheroes2                              *
+ *   Free Heroes of Might and Magic II: https://github.com/ihhub/fheroes2  *
+ *   Copyright (C) 2020                                                    *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -19,52 +17,46 @@
  *   Free Software Foundation, Inc.,                                       *
  *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
  ***************************************************************************/
-#ifndef H2GAMEDEFS_H
-#define H2GAMEDEFS_H
 
-#include "engine.h"
+#ifndef ENDIAN_H2_H
+#define ENDIAN_H2_H
 
-#define MAJOR_VERSION 0
-#define MINOR_VERSION 8
-#define INTERMEDIATE_VERSION 4
+#if defined( __linux__ ) || defined( __MINGW32__ )
+#include <endian.h>
 
-#ifdef WITH_XML
-#include "tinyxml.h"
+#elif defined( __FreeBSD__ )
+#include <sys/endian.h>
+
+#elif defined( _WIN32 ) || defined( _WIN64 )
+#include <stdlib.h>
+
+#define BIG_ENDIAN 4321
+#define LITTLE_ENDIAN 1234
+#define BYTE_ORDER LITTLE_ENDIAN
+
+#define htobe16( x ) _byteswap_ushort( x )
+#define htole16( x ) ( x )
+#define be16toh( x ) _byteswap_ushort( x )
+#define le16toh( x ) ( x )
+#define htobe32( x ) _byteswap_ulong( x )
+#define htole32( x ) ( x )
+#define be32toh( x ) _byteswap_ulong( x )
+#define le32toh( x ) ( x )
+
+#elif defined( __APPLE__ )
+#include <libkern/OSByteOrder.h>
+#define htobe16( x ) OSSwapHostToBigInt16( x )
+#define htole16( x ) OSSwapHostToLittleInt16( x )
+#define be16toh( x ) OSSwapBigToHostInt16( x )
+#define le16toh( x ) OSSwapLittleToHostInt16( x )
+#define htobe32( x ) OSSwapHostToBigInt32( x )
+#define htole32( x ) OSSwapHostToLittleInt32( x )
+#define be32toh( x ) OSSwapBigToHostInt32( x )
+#define le32toh( x ) OSSwapLittleToHostInt32( x )
+
+#else
+#error "Unsupported platform"
 #endif
 
-#include "translations.h"
-#define _( s ) Translation::gettext( s )
-#define _n( a, b, c ) Translation::ngettext( a, b, c )
-
-// hardcore defines: kingdom
-#define KINGDOMMAX 6
-
-// hardcore defines: world
-#define MAXCASTLES 72
-#define DAYOFWEEK 7
-#define WEEKOFMONTH 4
-
-// hardcore defines: castle
-#define CASTLEMAXMONSTER 6
-
-// hardcore defines: heroes
-#define HEROESMAXARTIFACT 14
-#define HEROESMAXSKILL 8
-#define HEROESMAXCOUNT 71
-
-// hardcore defines: skill
-#define MAXPRIMARYSKILL 4
-#define MAXSECONDARYSKILL 14
-
-// hardcore defines: army
-#define ARMYMAXTROOPS 5
-
-// hardcore defines: interface
-#define RADARWIDTH 144
-#define BORDERWIDTH 16
-
-// ai/hero speed
-#define DEFAULT_SPEED_DELAY 5
-#define DEFAULT_BATTLE_SPEED 4
-
+#define IS_BIGENDIAN ( BYTE_ORDER == BIG_ENDIAN )
 #endif
