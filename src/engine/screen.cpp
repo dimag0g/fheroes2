@@ -910,7 +910,7 @@ namespace fheroes2
 
     void Display::render()
     {
-        if (/* _cursor->isVisible() && !_cursor->_image.empty()*/1 ) {
+        if ( _cursor->isVisible() && !_cursor->_image.empty() ) {
             const Sprite & cursorImage = _cursor->_image;
             const Sprite backup = Crop( *this, cursorImage.x(), cursorImage.y(), cursorImage.width(), cursorImage.height() );
             Blit( cursorImage, *this, cursorImage.x(), cursorImage.y() );

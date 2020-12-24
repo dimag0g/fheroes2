@@ -72,7 +72,7 @@ LocalEvent::LocalEvent()
     , _isSoundPaused( false )
 {
 #ifdef WITHOUT_MOUSE
-    emulate_mouse = true; //!
+    emulate_mouse = false;
     emulate_mouse_up = KEY_UP;
     emulate_mouse_down = KEY_DOWN;
     emulate_mouse_left = KEY_LEFT;
@@ -778,14 +778,14 @@ void LocalEvent::HandleJoyButtonEvent(const SDL_JoyButtonEvent & button)
 
 void LocalEvent::ProcessAxisMotion()
 {
-    float settingsSpeedMod = pointer_speed/20000.0f;
+    float settingsSpeedMod = pointer_speed/40000.0f;
     
     SetModes(MOUSE_MOTION);
     
     //xaxis_float += ((pow(abs(xaxis_value), 1.03f) * (xaxis_value / abs(xaxis_value)) * deltaTime)) * settingsSpeedMod;
     //yaxis_float += ((pow(abs(yaxis_value), 1.03f) * (yaxis_value / abs(yaxis_value)) * deltaTime)) * settingsSpeedMod;
 	
-	float accel_factor = std::min(std::abs(xaxis_value)+std::abs(yaxis_value)+10000.0f / 10000.0f, 3.0f);
+	float accel_factor = std::min(std::abs(xaxis_value)+std::abs(yaxis_value)+3000.0f / 3000.0f, 3.0f);
 	
     mouse_cu.x += static_cast<s16>(xaxis_value * accel_factor * settingsSpeedMod);
     mouse_cu.y += static_cast<s16>(yaxis_value * accel_factor * settingsSpeedMod);
