@@ -19,11 +19,19 @@
 # -DCONFIGURE_FHEROES2_DATA: system fheroes2 game dir
 #
 
+PLATFORM = switch
+WITH_SDL2 = 1
+DEBUG = 1
+PATH := $(PATH):/opt/devkitpro/portlibs/switch/bin/
+
+export PLATFORM WITH_SDL2 DEBUG PATH
+
 TARGET	:= fheroes2
 
 all:
 	$(MAKE) -C src
 	@cp src/dist/$(TARGET) .
+	/opt/devkitpro/tools/bin/elf2nro $(TARGET) $(TARGET).nro --icon=heroes2.jpg --nacp=$(TARGET).nacp
 
 clean:
 	$(MAKE) -C src clean

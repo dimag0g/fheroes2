@@ -129,13 +129,13 @@ void LocalEvent::SetTapDelayForRightClickEmulation( u32 d )
     clock_delay = d < 200 ? TAP_DELAY_EMULATE : d;
 }
 
-void LocalEvent::SetMouseOffsetX( s16 x )
+void LocalEvent::SetMouseOffsetX( int16_t x )
 {
     SetModes( MOUSE_OFFSET );
     mouse_st.x = x;
 }
 
-void LocalEvent::SetMouseOffsetY( s16 y )
+void LocalEvent::SetMouseOffsetY( int16_t y )
 {
     SetModes( MOUSE_OFFSET );
     mouse_st.y = y;
@@ -663,8 +663,8 @@ void LocalEvent::HandleTouchEvent(const SDL_TouchFingerEvent & event)
 {
     SetModes(MOUSE_MOTION);
     
-    mouse_cu.x = static_cast<s16>(event.x * fheroes2::Display::instance().width());
-    mouse_cu.y = static_cast<s16>(event.y * fheroes2::Display::instance().height());
+    mouse_cu.x = static_cast<Sint16>(event.x * fheroes2::Display::instance().width());
+    mouse_cu.y = static_cast<Sint16>(event.y * fheroes2::Display::instance().height());
     
     if((modes & MOUSE_MOTION) && redraw_cursor_func)
     {
@@ -787,8 +787,8 @@ void LocalEvent::ProcessAxisMotion()
 	
 	float accel_factor = std::min(std::abs(xaxis_value)+std::abs(yaxis_value)+3000.0f / 3000.0f, 3.0f);
 	
-    mouse_cu.x += static_cast<s16>(xaxis_value * accel_factor * settingsSpeedMod);
-    mouse_cu.y += static_cast<s16>(yaxis_value * accel_factor * settingsSpeedMod);
+    mouse_cu.x += static_cast<Sint16>(xaxis_value * accel_factor * settingsSpeedMod);
+    mouse_cu.y += static_cast<Sint16>(yaxis_value * accel_factor * settingsSpeedMod);
     
     if(mouse_cu.x < 0) mouse_cu.x = 0;
     if(mouse_cu.y < 0) mouse_cu.y = 0;

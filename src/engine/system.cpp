@@ -100,9 +100,11 @@ std::string System::GetHomeDirectory( const std::string & prog )
     std::string res;
 
 #if SDL_VERSION_ATLEAST( 2, 0, 0 )
-    //!char * path = SDL_GetPrefPath( "", prog.c_str() );
-    //!res = path;
-    //!SDL_free( path );
+    char * path = SDL_GetPrefPath( "", prog.c_str() );
+    if ( path ) {
+        res = path;
+        SDL_free( path );
+    }
 #endif
 
     if ( System::GetEnvironment( "HOME" ) )
@@ -221,8 +223,9 @@ int System::SetEnvironment( const char * name, const char * value )
     // SDL 1.2.12 (char *)
     return SDL_putenv( &str[0] );
 #endif
+#elif defined( __SWITCH__ )
+    return SDL_setenv( name, value, 1 );
 #else
-    //!return setenv( name, value, 1 );
 #endif
 }
 
