@@ -21,6 +21,7 @@
  ***************************************************************************/
 
 #include "engine.h"
+#include "font.h"
 #include "sdlnet.h"
 #include "system.h"
 
@@ -40,9 +41,6 @@ namespace Cdrom
 
 bool SDL::Init( const u32 system )
 {
-    if ( System::isRunning() )
-        return false;
-
     if ( 0 > SDL_Init( system ) ) {
         ERROR( SDL_GetError() );
         return false;
@@ -56,6 +54,10 @@ bool SDL::Init( const u32 system )
 
     if ( SDL_INIT_AUDIO & system )
         Mixer::Init();
+#if SDL_VERSION_ATLEAST( 2, 0, 0 )
+    if ( SDL_INIT_GAMECONTROLLER & system )
+        LocalEvent::Get().OpenController();
+#endif
 #ifdef WITH_AUDIOCD
     if ( SDL_INIT_CDROM & system )
         Cdrom::Open();
@@ -72,18 +74,11 @@ bool SDL::Init( const u32 system )
     SDL_EnableKeyRepeat( SDL_DEFAULT_REPEAT_DELAY, SDL_DEFAULT_REPEAT_INTERVAL );
 #endif
 
-    System::CreateTrayIcon( true );
-    System::PowerManagerOff( true );
-    Surface::SetDefaultColorKey( 0xFF, 0, 0xFF );
-
     return true;
 }
 
 void SDL::Quit( void )
 {
-    System::CreateTrayIcon( false );
-    System::PowerManagerOff( false );
-
 #ifdef WITH_NET
     Network::Quit();
 #endif
@@ -93,6 +88,10 @@ void SDL::Quit( void )
 #ifdef WITH_AUDIOCD
     if ( SubSystem( SDL_INIT_CDROM ) )
         Cdrom::Close();
+#endif
+#if SDL_VERSION_ATLEAST( 2, 0, 0 )
+    if ( SubSystem( SDL_INIT_GAMECONTROLLER ) )
+        LocalEvent::Get().CloseController();
 #endif
     if ( SubSystem( SDL_INIT_AUDIO ) )
         Mixer::Quit();

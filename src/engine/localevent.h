@@ -24,7 +24,7 @@
 #define H2LOCALEVENT_H
 
 #include "rect.h"
-#include "thread.h"
+#include "timing.h"
 #include "types.h"
 
 enum KeySym
@@ -248,41 +248,37 @@ public:
     KeySym KeyValue( void ) const;
     int KeyMod( void ) const;
 
-#ifdef WITHOUT_MOUSE
-    void ToggleEmulateMouse( void );
-    void SetEmulateMouse( bool );
-    void SetEmulateMouseUpKey( KeySym );
-    void SetEmulateMouseDownKey( KeySym );
-    void SetEmulateMouseLeftKey( KeySym );
-    void SetEmulateMouseRightKey( KeySym );
-    void SetEmulateMouseStep( u8 );
-    void SetEmulatePressLeftKey( KeySym );
-    void SetEmulatePressRightKey( KeySym );
-    bool EmulateMouseAction( KeySym );
-#endif
-
-    void RegisterCycling() const;
+    void RegisterCycling( void ( *preRenderDrawing )() = nullptr, void ( *postRenderDrawing )() = nullptr ) const;
 
     // These two methods are useful for video playback
     void PauseCycling();
     void ResumeCycling();
+
+    void OpenController();
+    void CloseController();
+
+    void SetControllerPointerSpeed( const int newSpeed )
+    {
+        _controllerPointerSpeed = newSpeed / CONTROLLER_SPEED_MOD;
+    }
 
 private:
     LocalEvent();
 
     void HandleMouseMotionEvent( const SDL_MouseMotionEvent & );
     void HandleMouseButtonEvent( const SDL_MouseButtonEvent & );
-    void HandleKeyboardEvent( SDL_KeyboardEvent & );
+    void HandleKeyboardEvent( const SDL_KeyboardEvent & );
+
 #if defined(__SWITCH__)
-    void HandleJoyAxisEvent(const SDL_JoyAxisEvent & motion);
-    void HandleJoyButtonEvent(const SDL_JoyButtonEvent & button);
     void HandleTouchEvent(const SDL_TouchFingerEvent & event);
-    void ProcessAxisMotion(void);
 #endif
 
 #if SDL_VERSION_ATLEAST( 2, 0, 0 )
     void HandleMouseWheelEvent( const SDL_MouseWheelEvent & );
     static int GlobalFilterEvents( void *, SDL_Event * );
+    void HandleControllerAxisEvent( const SDL_ControllerAxisEvent & motion );
+    void HandleControllerButtonEvent( const SDL_ControllerButtonEvent & button );
+    void ProcessControllerAxisMotion();
 #else
     static int GlobalFilterEvents( const SDL_Event * );
 #endif
@@ -293,9 +289,9 @@ private:
         MOUSE_MOTION = 0x0002,
         MOUSE_PRESSED = 0x0004,
         GLOBAL_FILTER = 0x0008,
-        CLICK_LEFT = 0x0010,
-        CLICK_RIGHT = 0x0020,
-        CLICK_MIDDLE = 0x0040,
+        CLICK_LEFT = 0x0010, // either there is a click on left button or it was just released
+        CLICK_RIGHT = 0x0020, // either there is a click on right button or it was just released
+        CLICK_MIDDLE = 0x0040, // either there is a click on middle button or it was just released
         TAP_MODE = 0x0080,
         MOUSE_OFFSET = 0x0100,
         CLOCK_ON = 0x0200,
@@ -328,7 +324,7 @@ private:
     void ( *redraw_cursor_func )( s32, s32 );
     void ( *keyboard_filter_func )( int, int );
 
-    SDL::Time clock;
+    fheroes2::Time clock;
     u32 clock_delay;
     int loop_delay;
 
@@ -337,19 +333,31 @@ private:
     bool _isMusicPaused;
     bool _isSoundPaused;
 
-#ifdef WITHOUT_MOUSE
-    bool emulate_mouse;
-    KeySym emulate_mouse_up;
-    KeySym emulate_mouse_down;
-    KeySym emulate_mouse_left;
-    KeySym emulate_mouse_right;
-    int emulate_mouse_step;
-    KeySym emulate_press_left;
-    KeySym emulate_press_right;
+    enum
+    {
+        CONTROLLER_L_DEADZONE = 3000,
+        CONTROLLER_R_DEADZONE = 25000
+    };
+
+    // used to convert user-friendly pointer speed values into more useable ones
+    const double CONTROLLER_SPEED_MOD = 2000000.0;
+    // bigger value correndsponds to faster pointer movement speed with bigger stick axis values
+    const double CONTROLLER_AXIS_SPEEDUP = 1.03;
+
+#if SDL_VERSION_ATLEAST( 2, 0, 0 )
+    SDL_GameController * _gameController = nullptr;
 #endif
-#if defined(__SWITCH__)
-    float  pointer_speed = 2.0f;
-#endif	
+
+    fheroes2::Time _controllerTimer;
+    double _controllerPointerSpeed = 10.0 / CONTROLLER_SPEED_MOD;
+    double _controllerPointerPosX = 0;
+    double _controllerPointerPosY = 0;
+    int16_t _controllerLeftXAxis = 0;
+    int16_t _controllerLeftYAxis = 0;
+    int16_t _controllerRightXAxis = 0;
+    int16_t _controllerRightYAxis = 0;
+    bool _controllerScrollActive = false;
+    bool _dpadScrollActive = false;
 };
 
 #endif

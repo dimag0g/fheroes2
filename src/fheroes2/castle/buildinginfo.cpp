@@ -725,7 +725,7 @@ void BuildingInfo::SetStatusMessage( StatusBar & bar ) const
     bar.ShowMessage( str );
 }
 
-DwellingItem::DwellingItem( Castle & castle, u32 dw )
+DwellingItem::DwellingItem( const Castle & castle, u32 dw )
 {
     type = castle.GetActualDwelling( dw );
     mons = Monster( castle.GetRace(), type );
@@ -736,7 +736,7 @@ DwellingsBar::DwellingsBar( Castle & cstl, const Size & sz )
     , backsf( sz.w, sz.h )
 {
     for ( u32 dw = DWELLING_MONSTER1; dw <= DWELLING_MONSTER6; dw <<= 1 )
-        content.push_back( DwellingItem( castle, dw ) );
+        content.emplace_back( castle, dw );
 
     SetContent( content );
 
@@ -773,7 +773,7 @@ void DwellingsBar::RedrawItem( DwellingItem & dwl, const Rect & pos, fheroes2::I
         fheroes2::Blit( fheroes2::AGG::GetICN( ICN::CSLMARKER, 0 ), dstsf, pos.x + pos.w - 10, pos.y + 4 );
 }
 
-bool DwellingsBar::ActionBarSingleClick( DwellingItem & dwl )
+bool DwellingsBar::ActionBarLeftMouseSingleClick( DwellingItem & dwl )
 {
     if ( castle.isBuild( dwl.type ) ) {
         castle.RecruitMonster( Dialog::RecruitMonster( dwl.mons, castle.getMonstersInDwelling( dwl.type ), true ) );
@@ -792,7 +792,7 @@ bool DwellingsBar::ActionBarSingleClick( DwellingItem & dwl )
     return true;
 }
 
-bool DwellingsBar::ActionBarPressRight( DwellingItem & dwl )
+bool DwellingsBar::ActionBarRightMouseHold( DwellingItem & dwl )
 {
     Dialog::DwellingInfo( dwl.mons, castle.getMonstersInDwelling( dwl.type ) );
 

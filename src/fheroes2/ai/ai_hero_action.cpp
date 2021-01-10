@@ -56,7 +56,7 @@ namespace AI
     void AIToWagon( Heroes & hero, s32 dst_index );
     void AIToSkeleton( Heroes & hero, u32 obj, s32 dst_index );
     void AIToCaptureObject( Heroes & hero, u32 obj, s32 dst_index );
-    void AIToFlotSam( Heroes & hero, s32 dst_index );
+    void AIToFlotSam( const Heroes & hero, s32 dst_index );
     void AIToObservationTower( Heroes & hero, s32 dst_index );
     void AIToMagellanMaps( Heroes & hero, s32 dst_index );
     void AIToTeleports( Heroes & hero, s32 dst_index );
@@ -84,8 +84,8 @@ namespace AI
     void AIToDwellingRecruitMonster( Heroes & hero, u32 obj, s32 dst_index );
     void AIToStables( Heroes & hero, u32 obj, s32 dst_index );
     void AIToAbandoneMine( Heroes & hero, u32 obj, s32 dst_index );
-    void AIToBarrier( Heroes & hero, s32 dst_index );
-    void AIToTravellersTent( Heroes & hero, s32 dst_index );
+    void AIToBarrier( const Heroes & hero, s32 dst_index );
+    void AIToTravellersTent( const Heroes & hero, s32 dst_index );
     void AIToShipwreckSurvivor( Heroes & hero, u32 obj, s32 dst_index );
     void AIToBoat( Heroes & hero, s32 dst_index );
     void AIToCoast( Heroes & hero, s32 dst_index );
@@ -94,7 +94,7 @@ namespace AI
     bool AIHeroesShowAnimation( const Heroes & hero, uint32_t colors );
     static void AIWhirlpoolTroopLooseEffect( Heroes & hero );
 
-    int AISelectPrimarySkill( Heroes & hero )
+    int AISelectPrimarySkill( const Heroes & hero )
     {
         switch ( hero.GetRace() ) {
         case Race::KNGT: {
@@ -460,7 +460,7 @@ namespace AI
             DEBUG( DBG_AI, DBG_INFO, other_hero->GetName() << " currently can not allow battle" );
         }
         else {
-            Castle * other_hero_castle = other_hero->inCastle();
+            const Castle * other_hero_castle = other_hero->inCastle();
             if ( other_hero_castle && other_hero == other_hero_castle->GetHeroes().GuardFirst() ) {
                 AIToCastle( hero, dst_index );
                 return;
@@ -650,7 +650,7 @@ namespace AI
     void AIToPickupResource( Heroes & hero, int obj, s32 dst_index )
     {
         Maps::Tiles & tile = world.GetTiles( dst_index );
-        MapResource * map_resource = NULL;
+        const MapResource * map_resource = NULL;
         if ( tile.GetObject() == obj ) {
             map_resource = dynamic_cast<MapResource *>( world.GetMapObject( tile.GetObjectUID() ) );
         }
@@ -791,7 +791,7 @@ namespace AI
             if ( capture ) {
                 // update abandone mine
                 if ( obj == MP2::OBJ_ABANDONEDMINE ) {
-                    tile.UpdateAbandoneMineSprite( tile );
+                    Maps::Tiles::UpdateAbandoneMineSprite( tile );
                     tile.SetHeroes( &hero );
                 }
 
@@ -802,7 +802,7 @@ namespace AI
         DEBUG( DBG_AI, DBG_INFO, hero.GetName() << " captured: " << MP2::StringObject( obj ) );
     }
 
-    void AIToFlotSam( Heroes & hero, s32 dst_index )
+    void AIToFlotSam( const Heroes & hero, s32 dst_index )
     {
         Maps::Tiles & tile = world.GetTiles( dst_index );
 
@@ -1245,7 +1245,7 @@ namespace AI
                 if ( funds.GetValidItemsCount() )
                     hero.GetKingdom().OddFundsResource( funds );
                 hero.SetVisited( dst_index );
-                hero.IncreaseExperience( hero.GetExperienceFromLevel( hero.GetLevel() ) - hero.GetExperience() );
+                hero.IncreaseExperience( Heroes::GetExperienceFromLevel( hero.GetLevel() ) - hero.GetExperience() );
             }
         }
 
@@ -1328,10 +1328,10 @@ namespace AI
         AIToCaptureObject( hero, obj, dst_index );
     }
 
-    void AIToBarrier( Heroes & hero, s32 dst_index )
+    void AIToBarrier( const Heroes & hero, s32 dst_index )
     {
         Maps::Tiles & tile = world.GetTiles( dst_index );
-        Kingdom & kingdom = hero.GetKingdom();
+        const Kingdom & kingdom = hero.GetKingdom();
 
         if ( kingdom.IsVisitTravelersTent( tile.QuantityColor() ) ) {
             tile.RemoveObjectSprite();
@@ -1341,7 +1341,7 @@ namespace AI
         DEBUG( DBG_AI, DBG_INFO, hero.GetName() );
     }
 
-    void AIToTravellersTent( Heroes & hero, s32 dst_index )
+    void AIToTravellersTent( const Heroes & hero, s32 dst_index )
     {
         const Maps::Tiles & tile = world.GetTiles( dst_index );
         Kingdom & kingdom = hero.GetKingdom();
@@ -1369,7 +1369,7 @@ namespace AI
     void AIToArtifact( Heroes & hero, int obj, s32 dst_index )
     {
         Maps::Tiles & tile = world.GetTiles( dst_index );
-        MapArtifact * map_artifact = NULL;
+        const MapArtifact * map_artifact = NULL;
         if ( tile.GetObject() == obj ) {
             map_artifact = dynamic_cast<MapArtifact *>( world.GetMapObject( tile.GetObjectUID() ) );
         }
@@ -1521,7 +1521,7 @@ namespace AI
 
     bool HeroesValidObject( const Heroes & hero, s32 index )
     {
-        Maps::Tiles & tile = world.GetTiles( index );
+        const Maps::Tiles & tile = world.GetTiles( index );
         const u32 obj = tile.GetObject();
         const Army & army = hero.GetArmy();
         const Kingdom & kingdom = hero.GetKingdom();
@@ -1894,13 +1894,13 @@ namespace AI
             const Colors vcolors( Players::HumanColors() );
 
             for ( Colors::const_iterator it = vcolors.begin(); it != vcolors.end(); ++it ) {
-                const Player * player = conf.GetPlayers().Get( *it );
+                const Player * player = Players::Get( *it );
                 if ( player )
                     colors |= player->GetFriends();
             }
         }
         else {
-            const Player * player = conf.GetPlayers().Get( Players::HumanColors() );
+            const Player * player = Players::Get( Players::HumanColors() );
             if ( player )
                 colors = player->GetFriends();
         }
@@ -1929,7 +1929,7 @@ namespace AI
 
     void HeroesMove( Heroes & hero )
     {
-        Route::Path & path = hero.GetPath();
+        const Route::Path & path = hero.GetPath();
 
         if ( path.isValid() ) {
             hero.SetMove( true );
@@ -1938,7 +1938,7 @@ namespace AI
             Interface::Basic & I = Interface::Basic::Get();
             Interface::GameArea & gameArea = I.GetGameArea();
 
-            Settings & conf = Settings::Get();
+            const Settings & conf = Settings::Get();
 
             const uint32_t colors = AIGetAllianceColors();
             bool recenterNeeded = true;

@@ -45,9 +45,9 @@ std::vector<Campaign::ScenarioBonusData> getCampaignBonusData( const int /*campa
 
     // TODO: apply use of campaignID
     if ( scenarioId == 0 ) {
-        bonus.emplace_back( Campaign::ScenarioBonusData( Campaign::ScenarioBonusData::RESOURCES, Resource::GOLD, 2000 ) );
-        bonus.emplace_back( Campaign::ScenarioBonusData( Campaign::ScenarioBonusData::ARTIFACT, Artifact::THUNDER_MACE, 1 ) );
-        bonus.emplace_back( Campaign::ScenarioBonusData( Campaign::ScenarioBonusData::ARTIFACT, Artifact::MINOR_SCROLL, 1 ) );
+        bonus.emplace_back( Campaign::ScenarioBonusData::RESOURCES, Resource::GOLD, 2000 );
+        bonus.emplace_back( Campaign::ScenarioBonusData::ARTIFACT, Artifact::THUNDER_MACE, 1 );
+        bonus.emplace_back( Campaign::ScenarioBonusData::ARTIFACT, Artifact::MINOR_SCROLL, 1 );
     }
 
     return bonus;
@@ -78,7 +78,7 @@ namespace
 
     std::vector<Maps::FileInfo> GetCampaignMaps( const std::vector<std::string> & fileNames )
     {
-        const ListFiles files = Settings::Get().GetListFiles( "maps", ".h2c" );
+        const ListFiles files = Settings::GetListFiles( "maps", ".h2c" );
 
         std::vector<Maps::FileInfo> maps;
 
@@ -147,14 +147,13 @@ int Game::NewHotSeat( void )
     if ( conf.GameType() == Game::TYPE_CAMPAIGN )
         conf.SetCurrentFileInfo( Maps::FileInfo() );
 
-    conf.SetGameType( Game::TYPE_HOTSEAT );
-
     if ( conf.IsGameType( Game::TYPE_BATTLEONLY ) ) {
         conf.SetPreferablyCountPlayers( 2 );
         world.NewMaps( 10, 10 );
         return StartBattleOnly();
     }
     else {
+        conf.SetGameType( Game::TYPE_HOTSEAT );
         const u32 select = SelectCountPlayers();
         if ( select ) {
             conf.SetPreferablyCountPlayers( select );
@@ -184,9 +183,9 @@ int Game::NewCampain( void )
     campaignRoi.emplace_back( 382 + roiOffset.x, 58 + roiOffset.y, 222, 298 );
     campaignRoi.emplace_back( 30 + roiOffset.x, 59 + roiOffset.y, 224, 297 );
 
-    Video::ShowVideo( Settings::GetLastFile( System::ConcatePath( "heroes2", "anim" ), "INTRO.SMK" ), false );
-    Video::ShowVideo( Settings::GetLastFile( System::ConcatePath( "heroes2", "anim" ), "CHOOSEW.SMK" ), false );
-    const size_t chosenCampaign = Video::ShowVideo( Settings::GetLastFile( System::ConcatePath( "heroes2", "anim" ), "CHOOSE.SMK" ), true, campaignRoi );
+    Video::ShowVideo( "INTRO.SMK", false );
+    Video::ShowVideo( "CHOOSEW.SMK", false );
+    const size_t chosenCampaign = Video::ShowVideo( "CHOOSE.SMK", true, campaignRoi );
     const bool goodCampaign = chosenCampaign == 0;
 
     AGG::PlayMusic( MUS::VICTORY );

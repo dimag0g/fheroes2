@@ -20,6 +20,9 @@ jobs:
         brew install sdl_image
     - name: compile
       run: make -j 2
+      env:
+        FHEROES2_SDL1: "ON"
+        FHEROES2_STRICT_COMPILATION: "ON"
     - name: create package
       run: |
         cp doc/README.txt .
@@ -50,7 +53,6 @@ jobs:
     - name: compile
       run: make -j 2
       env:
-        WITH_SDL2: "ON"
         FHEROES2_STRICT_COMPILATION: "ON"
     - name: create package
       run: |
