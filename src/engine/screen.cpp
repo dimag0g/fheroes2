@@ -294,7 +294,8 @@ namespace
                     }
                 }
 
-                //!filteredResolutions = FilterResolutions( resolutionSet );
+                resolutionSet.insert( std::make_pair( 848, 480 ) );
+				filteredResolutions = FilterResolutions( resolutionSet );
             }
 
             return filteredResolutions;
@@ -642,7 +643,7 @@ namespace
                     }
                 }
 
-                //!filteredResolutions = FilterResolutions( resolutionSet );
+                filteredResolutions = FilterResolutions( resolutionSet );
             }
 
             return filteredResolutions;
