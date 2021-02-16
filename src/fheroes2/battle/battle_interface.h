@@ -30,12 +30,18 @@
 #include "game_delays.h"
 #include "gamedefs.h"
 #include "icn.h"
+#include "localevent.h"
 #include "spell.h"
 #include "statusbar.h"
 #include "text.h"
 #include "ui_button.h"
 
 class Settings;
+
+namespace fheroes2
+{
+    class StandardWindow;
+}
 
 namespace Battle
 {
@@ -127,7 +133,7 @@ namespace Battle
         {
             listlog = logs;
         };
-        void SetMessage( const std::string &, bool = false );
+        void SetMessage( const std::string & message, bool top = false );
         void Redraw( void );
         const std::string & GetMessage( void ) const;
 
@@ -168,15 +174,15 @@ namespace Battle
     public:
         PopupDamageInfo();
 
-        void SetInfo( const Cell * c, const Unit * a, const Unit * b, const Point & offset );
+        void SetInfo( const Cell * cell, const Unit * attacker, const Unit * defender, const Point & offset );
         void Reset();
         void Redraw( int, int );
 
     private:
-        const Cell * cell;
-        const Unit * attacker;
-        const Unit * defender;
-        bool redraw;
+        const Cell * _cell;
+        const Unit * _attacker;
+        const Unit * _defender;
+        bool _redraw;
     };
 
     class Interface
@@ -185,6 +191,7 @@ namespace Battle
         Interface( Arena &, s32 );
         ~Interface();
 
+        void fullRedraw(); // only at the start of the battle
         void Redraw();
         void RedrawPartialStart();
         void RedrawPartialFinish();
@@ -202,7 +209,7 @@ namespace Battle
         void RedrawActionAttackPart2( Unit &, TargetsInfo & );
         void RedrawActionSpellCastPart1( const Spell &, s32, const HeroBase *, const std::string &, const TargetsInfo & );
         void RedrawActionSpellCastPart2( const Spell &, TargetsInfo & );
-        void RedrawActionResistSpell( const Unit & );
+        void RedrawActionResistSpell( const Unit & target, bool playSound );
         void RedrawActionMonsterSpellCastStatus( const Unit &, const TargetInfo & );
         void RedrawActionMove( Unit &, const Indexes & );
         void RedrawActionFly( Unit &, const Position & );
@@ -231,7 +238,6 @@ namespace Battle
         void HumanBattleTurn( const Unit &, Actions &, std::string & );
         void HumanCastSpellTurn( const Unit &, Actions &, std::string & );
 
-        void RedrawBorder( void );
         void RedrawCover( void );
         void RedrawCoverStatic();
         void RedrawCoverBoard( const Settings &, const Board & );
@@ -286,7 +292,7 @@ namespace Battle
         void ButtonSkipAction( Actions & );
         void ButtonWaitAction( Actions & );
         void MouseLeftClickBoardAction( u32, const Cell &, Actions & );
-        void MousePressRightBoardAction( u32, const Cell &, Actions & );
+        void MousePressRightBoardAction( u32, const Cell & );
 
         int GetBattleCursor( std::string & ) const;
         int GetBattleSpellCursor( std::string & ) const;
@@ -341,6 +347,8 @@ namespace Battle
 
         PopupDamageInfo popup;
         ArmiesOrder armies_order;
+
+        std::unique_ptr<fheroes2::StandardWindow> _background;
     };
 }
 

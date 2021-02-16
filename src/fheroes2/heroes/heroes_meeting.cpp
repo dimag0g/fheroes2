@@ -31,7 +31,7 @@
 #include "game_interface.h"
 #include "heroes.h"
 #include "heroes_indicator.h"
-#include "settings.h"
+#include "logging.h"
 #include "skill_bar.h"
 #include "text.h"
 
@@ -57,7 +57,7 @@ public:
         if ( !troop.isValid() )
             return;
 
-        Text text( GetString( troop.GetCount() ), Font::SMALL );
+        Text text( std::to_string( troop.GetCount() ), Font::SMALL );
 
         const fheroes2::Sprite & mons32 = fheroes2::AGG::GetICN( ICN::MONS32, troop.GetSpriteIndex() );
         fheroes2::Rect srcrt( 0, 0, mons32.width(), mons32.height() );
@@ -145,7 +145,9 @@ public:
 class MeetingSecondarySkillsBar : public SecondarySkillsBar
 {
 public:
-    explicit MeetingSecondarySkillsBar() {}
+    explicit MeetingSecondarySkillsBar( const Heroes & hero )
+        : SecondarySkillsBar( hero )
+    {}
 
     virtual void RedrawBackground( const Rect & roi, fheroes2::Image & image ) override
     {
@@ -165,7 +167,7 @@ public:
         const fheroes2::Sprite & sprite = fheroes2::AGG::GetICN( ICN::MINISS, skill.GetIndexSprite2() );
         fheroes2::Blit( sprite, image, roi.x + ( roi.w - sprite.width() ) / 2, roi.y + ( roi.h - sprite.height() ) / 2 );
 
-        Text text( GetString( skill.Level() ), Font::SMALL );
+        Text text( std::to_string( skill.Level() ), Font::SMALL );
         text.Blit( roi.x + ( roi.w - text.w() ) - 3, roi.y + roi.h - text.h(), image );
     }
 
@@ -263,14 +265,14 @@ void Heroes::MeetingDialog( Heroes & heroes2 )
     RedrawPrimarySkillInfo( cur_pt, &primskill_bar1, &primskill_bar2 );
 
     // secondary skill
-    MeetingSecondarySkillsBar secskill_bar1;
+    MeetingSecondarySkillsBar secskill_bar1( *this );
     secskill_bar1.SetColRows( 8, 1 );
     secskill_bar1.SetHSpace( -1 );
     secskill_bar1.SetContent( secondary_skills.ToVector() );
     secskill_bar1.SetPos( cur_pt.x + 22, cur_pt.y + 199 );
     secskill_bar1.Redraw();
 
-    MeetingSecondarySkillsBar secskill_bar2;
+    MeetingSecondarySkillsBar secskill_bar2( heroes2 );
     secskill_bar2.SetColRows( 8, 1 );
     secskill_bar2.SetHSpace( -1 );
     secskill_bar2.SetContent( heroes2.GetSecondarySkills().ToVector() );
@@ -483,11 +485,11 @@ void RedrawPrimarySkillInfo( const Point & cur_pt, PrimarySkillsBar * bar1, Prim
 void Heroes::ScholarAction( Heroes & hero1, Heroes & hero2 )
 {
     if ( !hero1.HaveSpellBook() || !hero2.HaveSpellBook() ) {
-        DEBUG( DBG_GAME, DBG_INFO, "spell_book disabled" );
+        DEBUG_LOG( DBG_GAME, DBG_INFO, "spell_book disabled" );
         return;
     }
     else if ( !Settings::Get().ExtWorldEyeEagleAsScholar() ) {
-        DEBUG( DBG_GAME, DBG_WARN, "EyeEagleAsScholar settings disabled" );
+        DEBUG_LOG( DBG_GAME, DBG_WARN, "EyeEagleAsScholar settings disabled" );
         return;
     }
 
@@ -509,13 +511,13 @@ void Heroes::ScholarAction( Heroes & hero1, Heroes & hero2 )
         scholar = scholar2;
     }
     else {
-        DEBUG( DBG_GAME, DBG_WARN, "Eagle Eye skill not found" );
+        DEBUG_LOG( DBG_GAME, DBG_WARN, "Eagle Eye skill not found" );
         return;
     }
 
     // skip bag artifacts
-    SpellStorage teach = teacher->spell_book.SetFilter( SpellBook::ALL );
-    SpellStorage learn = learner->spell_book.SetFilter( SpellBook::ALL );
+    SpellStorage teach = teacher->spell_book.SetFilter( SpellBook::Filter::ALL );
+    SpellStorage learn = learner->spell_book.SetFilter( SpellBook::Filter::ALL );
 
     // remove_if for learn spells
     if ( learn.size() ) {

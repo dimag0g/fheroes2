@@ -23,8 +23,8 @@
 #include <cstdlib>
 #include <random>
 
+#include "logging.h"
 #include "rand.h"
-#include "system.h"
 
 namespace
 {
@@ -55,7 +55,7 @@ void Rand::Queue::Reset( void )
 void Rand::Queue::Push( s32 value, u32 percent )
 {
     if ( percent )
-        push_back( std::make_pair( value, percent ) );
+        emplace_back( value, percent );
 }
 
 size_t Rand::Queue::Size( void ) const
@@ -96,6 +96,6 @@ s32 Rand::Queue::Get( void )
             return ( *it ).first;
     }
 
-    ERROR( "weight not found, return 0" );
+    ERROR_LOG( "weight not found, return 0" );
     return 0;
 }

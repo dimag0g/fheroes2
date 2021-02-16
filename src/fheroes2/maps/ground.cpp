@@ -22,12 +22,13 @@
 
 #include "ground.h"
 #include "direction.h"
+#include "translations.h"
 #include "world.h"
 
 const char * Maps::Ground::String( int ground )
 {
     const char * str_ground[]
-        = {_( "Desert" ), _( "Snow" ), _( "Swamp" ), _( "Wasteland" ), _( "Beach" ), _( "Lava" ), _( "Dirt" ), _( "Grass" ), _( "Water" ), "Unknown"};
+        = {_( "Desert" ), _( "Snow" ), _( "Swamp" ), _( "Wasteland" ), _( "Beach" ), _( "Lava" ), _( "Dirt" ), _( "Grass" ), _( "Ocean" ), "Unknown"};
 
     switch ( ground ) {
     case DESERT:
@@ -49,10 +50,8 @@ const char * Maps::Ground::String( int ground )
     case WATER:
         return str_ground[8];
     default:
-        break;
+        return str_ground[9];
     }
-
-    return str_ground[8];
 }
 
 uint32_t Maps::Ground::GetPenalty( const Maps::Tiles & tile, uint32_t level )

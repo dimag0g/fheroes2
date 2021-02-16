@@ -27,14 +27,13 @@
 #include <list>
 
 #include "bitmodes.h"
-#include "campaign_data.h"
 #include "dir.h"
 #include "gamedefs.h"
 #include "maps_fileinfo.h"
 #include "players.h"
-#include "system.h"
 
-#define FORMAT_VERSION_090_RELEASE 9000
+#define FORMAT_VERSION_090_RELEASE 9001
+#define FORMAT_VERSION_084_RELEASE 9000
 #define FORMAT_VERSION_082_RELEASE 8200
 #define FORMAT_VERSION_080_RELEASE 8000
 #define FORMAT_VERSION_070_RELEASE 3269
@@ -42,50 +41,6 @@
 #define LAST_FORMAT_VERSION FORMAT_VERSION_3255
 
 #define CURRENT_FORMAT_VERSION FORMAT_VERSION_090_RELEASE // TODO: update this value for a new release
-
-enum
-{
-    DBG_WARN = 0x0001,
-    DBG_INFO = 0x0002,
-    DBG_TRACE = 0x0003,
-
-    DBG_ENGINE = 0x000C,
-    DBG_GAME = 0x0030,
-    DBG_BATTLE = 0x00C0,
-    DBG_AI = 0x0300,
-    DBG_NETWORK = 0x0C00,
-    DBG_OTHER = 0x3000,
-    DBG_DEVEL = 0xC000,
-
-    DBG_ENGINE_WARN = 0x0004,
-    DBG_GAME_WARN = 0x0010,
-    DBG_BATTLE_WARN = 0x0040,
-    DBG_AI_WARN = 0x0100,
-    DBG_NETWORK_WARN = 0x0400,
-    DBG_OTHER_WARN = 0x1000,
-
-    DBG_ENGINE_INFO = 0x0008,
-    DBG_GAME_INFO = 0x0020,
-    DBG_BATTLE_INFO = 0x0080,
-    DBG_AI_INFO = 0x0200,
-    DBG_NETWORK_INFO = 0x0800,
-    DBG_OTHER_INFO = 0x2000,
-
-    DBG_ENGINE_TRACE = DBG_ENGINE,
-    DBG_GAME_TRACE = DBG_GAME,
-    DBG_BATTLE_TRACE = DBG_BATTLE,
-    DBG_AI_TRACE = DBG_AI,
-    DBG_NETWORK_TRACE = DBG_NETWORK,
-    DBG_OTHER_TRACE = DBG_OTHER,
-
-    DBG_ALL = DBG_ENGINE | DBG_GAME | DBG_BATTLE | DBG_AI | DBG_NETWORK | DBG_OTHER,
-
-    DBG_ALL_WARN = DBG_ENGINE_WARN | DBG_GAME_WARN | DBG_BATTLE_WARN | DBG_AI_WARN | DBG_NETWORK_WARN | DBG_OTHER_WARN,
-    DBG_ALL_INFO = DBG_ENGINE_INFO | DBG_GAME_INFO | DBG_BATTLE_INFO | DBG_AI_INFO | DBG_NETWORK_INFO | DBG_OTHER_INFO,
-    DBG_ALL_TRACE = DBG_ENGINE_TRACE | DBG_GAME_TRACE | DBG_BATTLE_TRACE | DBG_AI_TRACE | DBG_NETWORK_TRACE | DBG_OTHER_TRACE
-};
-
-const char * StringDebug( int );
 
 enum
 {
@@ -102,18 +57,6 @@ enum MusicSource
     MUSIC_EXTERNAL,
     MUSIC_CDROM
 };
-
-#ifdef WITH_DEBUG
-#define DEBUG( x, y, z )                                                                                                                                                 \
-    if ( IS_DEBUG( x, y ) ) {                                                                                                                                            \
-        COUT( System::GetTime() << ": [" << StringDebug( x ) << "]\t" << __FUNCTION__ << ":  " << z );                                                                   \
-    }
-#else
-#define DEBUG( x, y, z )
-#endif
-#define IS_DEVEL() IS_DEBUG( DBG_DEVEL, DBG_INFO )
-
-bool IS_DEBUG( int name, int level );
 
 class Settings
 {
@@ -132,9 +75,6 @@ public:
         GAME_DYNAMIC_INTERFACE = 0x10010000,
         GAME_BATTLE_SHOW_DAMAGE = 0x10100000,
         GAME_CONTINUE_AFTER_VICTORY = 0x10200000,
-        POCKETPC_TAP_MODE = 0x11000000,
-        POCKETPC_DRAG_DROP_SCROLL = 0x12000000,
-        POCKETPC_LOW_RESOLUTION = 0x14000000,
 
         /* influence on game balance: save to savefile */
         WORLD_SHOW_VISITED_CONTENT = 0x20000001,
@@ -149,12 +89,12 @@ public:
         WORLD_BAN_PLAGUES = 0x20000800,
         UNIONS_ALLOW_HERO_MEETINGS = 0x20001000,
         UNIONS_ALLOW_CASTLE_VISITING = 0x20002000,
-        // UNUSED = 0x20004000,
+        WORLD_SHOW_TERRAIN_PENALTY = 0x20004000,
+        // UNUSED = 0x20008000,
         WORLD_BAN_MONTHOF_MONSTERS = 0x20010000,
         HEROES_TRANSCRIBING_SCROLLS = 0x20020000,
         WORLD_NEW_VERSION_WEEKOF = 0x20040000,
         CASTLE_ALLOW_GUARDIANS = 0x20080000,
-        HEROES_ALLOW_BANNED_SECSKILLS = 0x20400000,
         HEROES_COST_DEPENDED_FROM_LEVEL = 0x20800000,
         HEROES_REMEMBER_POINTS_RETREAT = 0x21000000,
         HEROES_SURRENDERING_GIVE_EXP = 0x22000000,
@@ -178,7 +118,6 @@ public:
         BATTLE_SOFT_WAITING = 0x40010000,
         BATTLE_REVERSE_WAIT_ORDER = 0x40020000,
         BATTLE_SKIP_INCREASE_DEFENSE = 0x40200000,
-        BATTLE_OBJECTS_ARCHERS_PENALTY = 0x42000000,
 
         SETTINGS_LAST
     };
@@ -204,6 +143,7 @@ public:
 
     const std::string & MapsCharset( void ) const;
     const std::string & ForceLang( void ) const;
+    const std::string & loadedFileLanguage() const;
     const std::string & FontsNormal( void ) const;
     const std::string & FontsSmall( void ) const;
     int FontsNormalSize( void ) const;
@@ -223,7 +163,6 @@ public:
 
     bool FullScreen( void ) const;
     bool KeepAspectRatio( void ) const;
-    bool ChangeFullscreenResolution( void ) const;
     bool Sound( void ) const;
     bool Music( void ) const;
     bool ShowControlPanel( void ) const;
@@ -232,7 +171,6 @@ public:
     bool ShowButtons( void ) const;
     bool ShowStatus( void ) const;
     bool Unicode( void ) const;
-    bool PocketPC( void ) const;
     bool BattleShowGrid( void ) const;
     bool BattleShowMouseShadow( void ) const;
     bool BattleShowMoveShadow( void ) const;
@@ -257,11 +195,11 @@ public:
     bool ExtHeroSurrenderingGiveExp( void ) const;
     bool ExtHeroRecalculateMovement( void ) const;
     bool ExtHeroAllowTranscribingScroll( void ) const;
-    bool ExtHeroAllowBannedSecSkillsUpgrade( void ) const;
     bool ExtHeroArenaCanChoiseAnySkills( void ) const;
     bool ExtUnionsAllowCastleVisiting( void ) const;
     bool ExtUnionsAllowHeroesMeetings( void ) const;
     bool ExtWorldShowVisitedContent( void ) const;
+    bool ExtWorldShowTerrainPenalty() const;
     bool ExtWorldScouteExtended( void ) const;
     bool ExtWorldAbandonedMineRandom( void ) const;
     bool ExtWorldAllowSetGuardian( void ) const;
@@ -287,7 +225,6 @@ public:
     bool ExtBattleShowDamage( void ) const;
     bool ExtBattleShowBattleOrder( void ) const;
     bool ExtBattleSoftWait( void ) const;
-    bool ExtBattleObjectsArchersPenalty( void ) const;
     bool ExtBattleSkipIncreaseDefense( void ) const;
     bool ExtBattleReverseWaitOrder( void ) const;
     bool ExtGameRememberLastFocus( void ) const;
@@ -300,10 +237,8 @@ public:
     bool ExtGameEvilInterface( void ) const;
     bool ExtGameDynamicInterface( void ) const;
     bool ExtGameHideInterface( void ) const;
-    bool ExtPocketTapMode( void ) const;
-    bool ExtPocketDragDropScroll( void ) const;
 
-    const Size & VideoMode( void ) const;
+    const fheroes2::Size & VideoMode() const;
 
     void SetDebug( int );
     void SetUnicode( bool );
@@ -323,6 +258,7 @@ public:
     void SetScrollSpeed( int );
     void SetHeroesMoveSpeed( int );
     void SetBattleSpeed( int );
+    void setFullScreen( const bool enable );
 
     void SetSoundVolume( int v );
     void SetMusicVolume( int v );
@@ -337,11 +273,6 @@ public:
     bool IsGameType( int type ) const;
     int GameType( void ) const;
     void SetGameType( int );
-
-    void SetCurrentCampaignScenarioBonus( const Campaign::ScenarioBonusData & bonus );
-    void SetCurrentCampaignScenarioID( const int scenarioID );
-    void SetCurrentCampaignID( const int campaignID );
-    void AddCurrentCampaignMapToFinished();
 
     Players & GetPlayers( void );
     const Players & GetPlayers( void ) const;
@@ -358,6 +289,7 @@ public:
     const std::string & MapsFile( void ) const;
     const std::string & MapsName( void ) const;
     const std::string & MapsDescription( void ) const;
+    const std::string & externalMusicCommand() const;
     int MapsDifficulty( void ) const;
     Size MapsSize( void ) const;
     bool GameStartWithHeroes( void ) const;
@@ -371,6 +303,7 @@ public:
     Point WinsMapsPositionObject( void ) const;
     Point LossMapsPositionObject( void ) const;
     u32 LossCountDays( void ) const;
+    int controllerPointerSpeed() const;
 
     std::string GetProgramPath( void ) const
     {
@@ -414,7 +347,7 @@ private:
     BitModes opt_addons;
 
     int debug;
-    Size video_mode;
+    fheroes2::Size video_mode;
     int game_difficulty;
 
     std::string path_program;
@@ -424,6 +357,8 @@ private:
     std::string font_normal;
     std::string font_small;
     std::string force_lang;
+    std::string _loadedFileLanguage; // not a part of save or configuration file
+    std::string _externalMusicCommand;
     std::string maps_charset;
     int size_normal;
     int size_small;
@@ -452,8 +387,6 @@ private:
     Point pos_stat;
 
     Players players;
-
-    Campaign::CampaignData campaignData;
 };
 
 StreamBase & operator<<( StreamBase &, const Settings & );

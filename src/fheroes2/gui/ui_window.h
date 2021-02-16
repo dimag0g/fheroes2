@@ -1,8 +1,6 @@
 /***************************************************************************
- *   Copyright (C) 2009 by Andrey Afletdinov <fheroes2@gmail.com>          *
- *                                                                         *
- *   Part of the Free Heroes2 Engine:                                      *
- *   http://sourceforge.net/projects/fheroes2                              *
+ *   Free Heroes of Might and Magic II: https://github.com/ihhub/fheroes2  *
+ *   Copyright (C) 2021                                                    *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -20,28 +18,30 @@
  *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
  ***************************************************************************/
 
-#include <iostream>
+#pragma once
 
-#include "audio_music.h"
-#include "engine.h"
+#include "screen.h"
 
-int main( int argc, char ** argv )
+namespace fheroes2
 {
-    if ( argc != 3 ) {
-        std::cout << argv[0] << " infile.xmi outfile.mid" << std::endl;
-        return EXIT_SUCCESS;
-    }
+    // Standard window with shadow
+    class StandardWindow
+    {
+    public:
+        StandardWindow( const int32_t width, const int32_t height, Image & output = Display::instance() );
+        StandardWindow( const int32_t x, const int32_t y, const int32_t width, const int32_t height, Image & output = Display::instance() );
 
-    std::vector<u8> buf = LoadFileToMem( argv[1] );
+        const Rect & activeArea() const
+        {
+            return _activeArea;
+        }
 
-    if ( buf.size() ) {
-        buf = Music::Xmi2Mid( buf );
+        void render();
 
-        if ( buf.empty() )
-            std::cerr << ", file: " << argv[1] << std::endl;
-        else
-            SaveMemToFile( buf, std::string( argv[2] ) );
-    }
-
-    return 0;
+    private:
+        Image & _output;
+        Rect _activeArea;
+        Rect _windowArea;
+        ImageRestorer _restorer;
+    };
 }

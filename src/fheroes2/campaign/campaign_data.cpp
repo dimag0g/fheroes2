@@ -1,6 +1,6 @@
 /***************************************************************************
  *   Free Heroes of Might and Magic II: https://github.com/ihhub/fheroes2  *
- *   Copyright (C) 2020                                                    *
+ *   Copyright (C) 2021                                                    *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -20,25 +20,88 @@
 
 #include "campaign_data.h"
 #include "artifact.h"
-#include "assert.h"
+#include "maps_fileinfo.h"
 #include "monster.h"
 #include "resource.h"
+#include <cassert>
 
 namespace Campaign
 {
-    void CampaignData::addCampaignAward( const std::string & award )
+    CampaignData::CampaignData()
+        : _campaignID( 0 )
+        , _isGoodCampaign( false )
+        , _campaignDescription()
+        , _scenarios()
+    {}
+
+    const std::vector<int> CampaignData::getScenariosBefore( const int scenarioID ) const
     {
-        _earnedCampaignAwards.emplace_back( award );
+        std::vector<int> scenarioIDs;
+
+        for ( size_t i = 0; i < _scenarios.size(); ++i ) {
+            if ( _scenarios[i].getScenarioID() >= scenarioID )
+                break;
+
+            const std::vector<int> & nextMaps = _scenarios[i].getNextMaps();
+
+            // if any of this scenario's next maps is the one passed as param, then this scenario is a previous scenario
+            if ( std::find( nextMaps.begin(), nextMaps.end(), scenarioID ) != nextMaps.end() )
+                scenarioIDs.emplace_back( _scenarios[i].getScenarioID() );
+        }
+
+        return scenarioIDs;
     }
 
-    void CampaignData::setCurrentScenarioBonus( const ScenarioBonusData & bonus )
+    const std::vector<int> & CampaignData::getScenariosAfter( const int scenarioID ) const
     {
-        _currentScenarioBonus = bonus;
+        for ( size_t i = 0; i < _scenarios.size(); ++i ) {
+            if ( _scenarios[i].getScenarioID() == scenarioID )
+                return _scenarios[i].getNextMaps();
+        }
+
+        return _scenarios[scenarioID].getNextMaps();
     }
 
-    void CampaignData::setCurrentScenarioID( const int scenarioID )
+    const std::vector<int> CampaignData::getStartingScenarios() const
     {
-        _currentScenarioID = scenarioID;
+        std::vector<int> startingScenarios;
+
+        for ( size_t i = 0; i < _scenarios.size(); ++i ) {
+            const int scenarioID = _scenarios[i].getScenarioID();
+            if ( isStartingScenario( scenarioID ) )
+                startingScenarios.emplace_back( scenarioID );
+        }
+
+        return startingScenarios;
+    }
+
+    bool CampaignData::isStartingScenario( const int scenarioID ) const
+    {
+        // starting scenario = a scenario that is never included as a nextMap
+        for ( size_t i = 0; i < _scenarios.size(); ++i ) {
+            const std::vector<int> & nextMaps = _scenarios[i].getNextMaps();
+
+            if ( std::find( nextMaps.begin(), nextMaps.end(), scenarioID ) != nextMaps.end() )
+                return false;
+        }
+
+        return true;
+    }
+
+    bool CampaignData::isAllCampaignMapsPresent() const
+    {
+        for ( size_t i = 0; i < _scenarios.size(); ++i ) {
+            if ( !_scenarios[i].isMapFilePresent() )
+                return false;
+        }
+
+        return true;
+    }
+
+    bool CampaignData::isLastScenario( const int scenarioID ) const
+    {
+        assert( !_scenarios.empty() );
+        return scenarioID == _scenarios.back().getScenarioID();
     }
 
     void CampaignData::setCampaignID( const int campaignID )
@@ -46,70 +109,18 @@ namespace Campaign
         _campaignID = campaignID;
     }
 
-    void CampaignData::addCurrentMapToFinished()
+    void CampaignData::setCampaignAlignment( const bool isGoodCampaign )
     {
-        _finishedMaps.emplace_back( _currentScenarioID );
+        _isGoodCampaign = isGoodCampaign;
     }
 
-    ScenarioBonusData::ScenarioBonusData()
-        : _type( 0 )
-        , _subType( 0 )
-        , _amount( 0 )
-    {}
-
-    ScenarioBonusData::ScenarioBonusData( uint32_t type, uint32_t subType, uint32_t amount )
-        : _type( type )
-        , _subType( subType )
-        , _amount( amount )
-    {}
-
-    CampaignData::CampaignData()
-        : _finishedMaps()
-        , _earnedCampaignAwards()
-        , _currentScenarioID( 0 )
-        , _campaignID( 0 )
-        , _currentScenarioBonus()
-    {}
-
-    std::string ScenarioBonusData::ToString() const
+    void CampaignData::setCampaignScenarios( const std::vector<ScenarioData> & scenarios )
     {
-        std::string objectName;
-
-        switch ( _type ) {
-        case ScenarioBonusData::ARTIFACT:
-            objectName = Artifact( _subType ).GetName();
-            break;
-        case ScenarioBonusData::RESOURCES:
-            objectName = Resource::String( _subType );
-            break;
-        case ScenarioBonusData::TROOP:
-            objectName = Monster( _subType ).GetPluralName( _amount );
-            break;
-        default:
-            assert( 0 ); // some new bonus?
-        }
-
-        const bool useAmount = _amount > 1;
-        return useAmount ? std::to_string( _amount ) + " " + objectName : objectName;
+        _scenarios = scenarios;
     }
 
-    StreamBase & operator<<( StreamBase & msg, const Campaign::CampaignData & data )
+    void CampaignData::setCampaignDescription( const std::string & campaignDescription )
     {
-        return msg << data._earnedCampaignAwards << data._currentScenarioID << data._currentScenarioBonus << data._finishedMaps;
-    }
-
-    StreamBase & operator>>( StreamBase & msg, Campaign::CampaignData & data )
-    {
-        return msg >> data._earnedCampaignAwards >> data._currentScenarioID >> data._currentScenarioBonus >> data._finishedMaps;
-    }
-
-    StreamBase & operator<<( StreamBase & msg, const Campaign::ScenarioBonusData & data )
-    {
-        return msg << data._type << data._subType << data._amount;
-    }
-
-    StreamBase & operator>>( StreamBase & msg, Campaign::ScenarioBonusData & data )
-    {
-        return msg >> data._type >> data._subType >> data._amount;
+        _campaignDescription = campaignDescription;
     }
 }

@@ -22,18 +22,12 @@
 #ifndef H2GAMEDEFS_H
 #define H2GAMEDEFS_H
 
-#include "rand.h"
-#include "serialize.h"
 #include "tools.h"
 #include "types.h"
 
 #define MAJOR_VERSION 0
-#define MINOR_VERSION 8
-#define INTERMEDIATE_VERSION 4
-
-#include "translations.h"
-#define _( s ) Translation::gettext( s )
-#define _n( a, b, c ) Translation::ngettext( a, b, c )
+#define MINOR_VERSION 9
+#define INTERMEDIATE_VERSION 0
 
 // hardcore defines: kingdom
 #define KINGDOMMAX 6

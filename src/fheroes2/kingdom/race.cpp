@@ -22,7 +22,8 @@
 
 #include "race.h"
 #include "engine.h"
-#include "gamedefs.h"
+#include "rand.h"
+#include "translations.h"
 
 const std::string & Race::String( int race )
 {

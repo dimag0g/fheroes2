@@ -25,8 +25,10 @@
 
 #include "audio_mixer.h"
 #include "audio_music.h"
-#include "system.h"
+#include "logging.h"
 #include "tools.h"
+
+#include <SDL.h>
 
 #ifdef WITH_MIXER
 #include <SDL_mixer.h>
@@ -47,7 +49,7 @@ void Music::Play( Mix_Music * mix, /*u32 id,*/ bool loop )
     int res = fadein ? Mix_FadeInMusic( mix, loop ? -1 : 0, fadein ) : Mix_PlayMusic( mix, loop ? -1 : 0 );
 
     if ( res < 0 ) {
-        ERROR( Mix_GetError() );
+        ERROR_LOG( Mix_GetError() );
     }
     else
         music = mix;
@@ -75,7 +77,7 @@ void Music::Play( const std::string & file, bool loop )
         Mix_Music * mix = Mix_LoadMUS( file.c_str() );
 
         if ( !mix ) {
-            ERROR( Mix_GetError() );
+            ERROR_LOG( Mix_GetError() );
         }
         else
             Music::Play( mix, /*id,*/ loop );
@@ -173,7 +175,7 @@ int callbackPlayMusic( void * ptr )
 
         do {
             std::system( os.str().c_str() );
-            DELAY( 100 );
+            fheroes2::delayforMs( 100 );
         } while ( info->status & Music::LOOP );
 
         info->status &= ~Music::PLAY;
@@ -274,7 +276,7 @@ void Music::Play( const std::string & f, bool loop )
             Pause();
             current = it;
             Resume();
-            DELAY( 100 );
+            fheroes2::delayforMs( 100 );
         }
 
         if ( ( *it ).isPlay() )

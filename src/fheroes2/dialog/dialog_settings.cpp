@@ -26,9 +26,11 @@
 #include "cursor.h"
 #include "dialog.h"
 #include "interface_list.h"
+#include "localevent.h"
 #include "settings.h"
 #include "text.h"
 #include "ui_button.h"
+#include "ui_window.h"
 
 class SettingsListBox : public Interface::ListBox<u32>
 {
@@ -145,8 +147,8 @@ void Dialog::ExtSettings( bool readonly )
     cursor.Hide();
     cursor.SetThemes( cursor.POINTER );
 
-    Dialog::FrameBorder frameborder( Size( 320, 400 ) );
-    const Rect & area = frameborder.GetArea();
+    const fheroes2::StandardWindow frameborder( 320, 400 );
+    const Rect area( frameborder.activeArea() );
 
     Text text( "Experimental Game Settings", Font::YELLOW_BIG );
     text.Blit( area.x + ( area.w - text.w() ) / 2, area.y + 6 );
@@ -162,17 +164,17 @@ void Dialog::ExtSettings( bool readonly )
 
     states.push_back( Settings::GAME_HIDE_INTERFACE );
 
-    if ( !conf.PocketPC() )
-        states.push_back( Settings::GAME_DYNAMIC_INTERFACE );
+    states.push_back( Settings::GAME_DYNAMIC_INTERFACE );
 
     states.push_back( Settings::GAME_AUTOSAVE_ON );
     states.push_back( Settings::GAME_AUTOSAVE_BEGIN_DAY );
 
-    if ( conf.VideoMode() == Size( fheroes2::Display::DEFAULT_WIDTH, fheroes2::Display::DEFAULT_HEIGHT ) )
+    if ( conf.VideoMode() == fheroes2::Size( fheroes2::Display::DEFAULT_WIDTH, fheroes2::Display::DEFAULT_HEIGHT ) )
         states.push_back( Settings::GAME_USE_FADE );
 
     states.push_back( Settings::GAME_CONTINUE_AFTER_VICTORY );
     states.push_back( Settings::WORLD_SHOW_VISITED_CONTENT );
+    states.push_back( Settings::WORLD_SHOW_TERRAIN_PENALTY );
     states.push_back( Settings::WORLD_ABANDONED_MINE_RANDOM );
     states.push_back( Settings::WORLD_ALLOW_SET_GUARDIAN );
     states.push_back( Settings::WORLD_EXT_OBJECTS_CAPTURED );
@@ -199,7 +201,6 @@ void Dialog::ExtSettings( bool readonly )
     states.push_back( Settings::HEROES_SURRENDERING_GIVE_EXP );
     states.push_back( Settings::HEROES_RECALCULATE_MOVEMENT );
     states.push_back( Settings::HEROES_TRANSCRIBING_SCROLLS );
-    states.push_back( Settings::HEROES_ALLOW_BANNED_SECSKILLS );
     states.push_back( Settings::HEROES_ARENA_ANY_SKILLS );
 
     states.push_back( Settings::CASTLE_ALLOW_GUARDIANS );
@@ -210,14 +211,8 @@ void Dialog::ExtSettings( bool readonly )
 
     states.push_back( Settings::BATTLE_SHOW_ARMY_ORDER );
     states.push_back( Settings::BATTLE_SOFT_WAITING );
-    states.push_back( Settings::BATTLE_OBJECTS_ARCHERS_PENALTY );
     states.push_back( Settings::BATTLE_SKIP_INCREASE_DEFENSE );
     states.push_back( Settings::BATTLE_REVERSE_WAIT_ORDER );
-
-    if ( conf.PocketPC() ) {
-        states.push_back( Settings::POCKETPC_TAP_MODE );
-        states.push_back( Settings::POCKETPC_DRAG_DROP_SCROLL );
-    }
 
     std::sort( states.begin(), states.end(),
                [&conf]( uint32_t first, uint32_t second ) { return std::string( conf.ExtName( first ) ) > std::string( conf.ExtName( second ) ); } );
@@ -268,6 +263,5 @@ void Dialog::ExtSettings( bool readonly )
         }
     }
 
-    le.SetTapMode( conf.ExtPocketTapMode() );
     Settings::Get().BinarySave();
 }

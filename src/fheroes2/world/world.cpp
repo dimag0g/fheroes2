@@ -32,12 +32,12 @@
 #include "game_static.h"
 #include "ground.h"
 #include "heroes.h"
+#include "logging.h"
 #include "maps_actions.h"
 #include "mp2.h"
 #include "pairs.h"
 #include "race.h"
 #include "resource.h"
-#include "settings.h"
 #include "text.h"
 #include "world.h"
 
@@ -73,10 +73,10 @@ void MapObjects::clear( void )
 void MapObjects::add( MapObjectSimple * obj )
 {
     if ( obj ) {
-        std::map<u32, MapObjectSimple *> & map = *this;
-        if ( map[obj->GetUID()] )
-            delete map[obj->GetUID()];
-        map[obj->GetUID()] = obj;
+        std::map<u32, MapObjectSimple *> & currentMap = *this;
+        if ( currentMap[obj->GetUID()] )
+            delete currentMap[obj->GetUID()];
+        currentMap[obj->GetUID()] = obj;
     }
 }
 
@@ -355,21 +355,21 @@ Maps::Tiles & World::GetTiles( u32 ax, u32 ay )
     return GetTiles( ay * w() + ax );
 }
 
-const Maps::Tiles & World::GetTiles( s32 index ) const
+const Maps::Tiles & World::GetTiles( const int32_t tileId ) const
 {
 #ifdef WITH_DEBUG
-    return vec_tiles.at( index );
+    return vec_tiles.at( tileId );
 #else
-    return vec_tiles[index];
+    return vec_tiles[tileId];
 #endif
 }
 
-Maps::Tiles & World::GetTiles( s32 index )
+Maps::Tiles & World::GetTiles( const int32_t tileId )
 {
 #ifdef WITH_DEBUG
-    return vec_tiles.at( index );
+    return vec_tiles.at( tileId );
 #else
-    return vec_tiles[index];
+    return vec_tiles[tileId];
 #endif
 }
 
@@ -493,7 +493,8 @@ void World::pickRumor()
         assert( 0 );
         return;
     }
-    else if ( vec_rumors.size() == 1 ) {
+
+    if ( vec_rumors.size() == 1 ) {
         _rumor = &vec_rumors.front();
         assert( 0 );
         return;
@@ -611,7 +612,7 @@ void World::MonthOfMonstersAction( const Monster & mons )
         for ( MapsTiles::const_iterator it = vec_tiles.begin(); it != vec_tiles.end(); ++it ) {
             const Maps::Tiles & tile = *it;
 
-            if ( !tile.isWater() && MP2::OBJ_ZERO == tile.GetObject() && tile.isPassable( Direction::CENTER, false, true )
+            if ( !tile.isWater() && MP2::OBJ_ZERO == tile.GetObject() && tile.isPassable( Direction::CENTER, false, true, 0 )
                  && excld.end() == std::find( excld.begin(), excld.end(), tile.GetIndex() ) ) {
                 tiles.push_back( tile.GetIndex() );
                 const MapsIndexes & obja = Maps::GetAroundIndexes( tile.GetIndex(), dist );
@@ -661,7 +662,7 @@ s32 World::NextTeleport( s32 index ) const
 {
     const MapsIndexes teleports = GetTeleportEndPoints( index );
     if ( teleports.empty() ) {
-        DEBUG( DBG_GAME, DBG_WARN, "not found" );
+        DEBUG_LOG( DBG_GAME, DBG_WARN, "not found" );
     }
 
     const int32_t * randValue = Rand::Get( teleports );
@@ -672,16 +673,14 @@ s32 World::NextTeleport( s32 index ) const
 MapsIndexes World::GetWhirlpoolEndPoints( s32 center ) const
 {
     if ( MP2::OBJ_WHIRLPOOL == GetTiles( center ).GetObject( false ) ) {
-        MapsIndexes whilrpools = Maps::GetObjectPositions( MP2::OBJ_WHIRLPOOL, true );
         std::map<s32, MapsIndexes> uniq_whirlpools;
 
-        for ( MapsIndexes::const_iterator it = whilrpools.begin(); it != whilrpools.end(); ++it ) {
+        for ( MapsIndexes::const_iterator it = _whirlpoolTiles.begin(); it != _whirlpoolTiles.end(); ++it ) {
             uniq_whirlpools[GetTiles( *it ).GetObjectUID()].push_back( *it );
         }
-        whilrpools.clear();
 
         if ( 2 > uniq_whirlpools.size() ) {
-            DEBUG( DBG_GAME, DBG_WARN, "is empty" );
+            DEBUG_LOG( DBG_GAME, DBG_WARN, "is empty" );
             return MapsIndexes();
         }
 
@@ -707,7 +706,7 @@ s32 World::NextWhirlpool( s32 index ) const
 {
     const MapsIndexes whilrpools = GetWhirlpoolEndPoints( index );
     if ( whilrpools.empty() ) {
-        DEBUG( DBG_GAME, DBG_WARN, "is full" );
+        DEBUG_LOG( DBG_GAME, DBG_WARN, "is full" );
     }
 
     const int32_t * randValue = Rand::Get( whilrpools );
@@ -855,9 +854,9 @@ EventsDate World::GetEventsDate( int color ) const
 std::string World::DateString( void ) const
 {
     std::ostringstream os;
-    os << "month: " << static_cast<int>( GetMonth() ) << ", "
-       << "week: " << static_cast<int>( GetWeek() ) << ", "
-       << "day: " << static_cast<int>( GetDay() );
+    os << "month: " << GetMonth() << ", "
+       << "week: " << GetWeek() << ", "
+       << "day: " << GetDay();
     return os.str();
 }
 
@@ -1061,6 +1060,7 @@ void World::PostLoad()
 
     // cache data that's accessed often
     _allTeleporters = Maps::GetObjectPositions( MP2::OBJ_STONELITHS, true );
+    _whirlpoolTiles = Maps::GetObjectPositions( MP2::OBJ_WHIRLPOOL, true );
 
     resetPathfinder();
     ComputeStaticAnalysis();
@@ -1258,12 +1258,12 @@ void EventDate::LoadFromMP2( StreamBuf st )
 
         // message
         message = Game::GetEncodeString( st.toString() );
-        DEBUG( DBG_GAME, DBG_INFO,
-               "event"
-                   << ": " << message );
+        DEBUG_LOG( DBG_GAME, DBG_INFO,
+                   "event"
+                       << ": " << message );
     }
     else {
-        DEBUG( DBG_GAME, DBG_WARN, "unknown id" );
+        DEBUG_LOG( DBG_GAME, DBG_WARN, "unknown id" );
     }
 }
 

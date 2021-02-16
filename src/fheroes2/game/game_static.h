@@ -24,6 +24,7 @@
 #define H2GAMESTATIC_H
 
 #include "gamedefs.h"
+#include "serialize.h"
 
 namespace Skill
 {
@@ -57,7 +58,9 @@ namespace GameStatic
     u32 GetHeroesRestoreSpellPointsPerDay( void );
     u32 GetMageGuildRestoreSpellPointsPercentDay( int level );
 
-    float GetMonsterUpgradeRatio( void );
+    bool isCustomMonsterUpgradeOption();
+    float GetMonsterUpgradeRatio();
+
     s32 ObjectVisitedModifiers( int obj );
 
     int GetBattleMoatReduceDefense( void );

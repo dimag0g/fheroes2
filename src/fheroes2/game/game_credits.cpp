@@ -20,16 +20,17 @@
 
 #include "game_credits.h"
 #include "agg.h"
-#include "dialog.h"
+#include "localevent.h"
 #include "mus.h"
 #include "screen.h"
 #include "settings.h"
 #include "text.h"
+#include "ui_window.h"
 
 void Game::ShowCredits()
 {
     fheroes2::Display & display = fheroes2::Display::instance();
-    Dialog::FrameBorder border( Size( display.DEFAULT_WIDTH, display.DEFAULT_HEIGHT ) );
+    const fheroes2::StandardWindow border( display.DEFAULT_WIDTH, display.DEFAULT_HEIGHT );
 
     const fheroes2::Point screenOffset( ( display.width() - display.DEFAULT_WIDTH ) / 2, ( display.height() - display.DEFAULT_HEIGHT ) / 2 );
 
@@ -95,7 +96,7 @@ void Game::ShowCredits()
     title.Blit( screenOffset.x + 2 * columnStep + ( columnStep - title.w() ) / 2, offsetY );
     offsetY += title.h();
 
-    const std::string contributors( "LeHerosInconnu\nshprotru\nundef21\nAndrey Starodubtsev\neos428\nVasilenko Alexey\nvincent-grosbois\nemotionalamoeba\nOroty\n"
+    const std::string contributors( "LeHerosInconnu\nshprotru\nundef21\nvincent-grosbois\neos428\nAndrey Starodubtsev\nVasilenko Alexey\nemotionalamoeba\ntau3\n"
                                     "and many other contributors!" );
 
     name.Set( contributors, Font::BIG, textWidth );

@@ -20,46 +20,12 @@
  *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
  ***************************************************************************/
 
-#include <fstream>
 #include <iomanip>
 #include <iostream>
-#include <sstream>
 
-#include <SDL.h>
-
-#include "engine.h"
-#include "palette_h2.h"
+#include "image_tool.h"
+#include "serialize.h"
 #include "system.h"
-
-namespace H2Palette
-{
-    std::vector<SDL_Color> pal_colors;
-
-    void Init( void )
-    {
-        // load palette
-        u32 ncolors = ARRAY_COUNT( kb_pal ) / 3;
-        pal_colors.reserve( ncolors );
-
-        for ( u32 ii = 0; ii < ncolors; ++ii ) {
-            u32 index = ii * 3;
-            SDL_Color cols;
-
-            cols.r = kb_pal[index] << 2;
-            cols.g = kb_pal[index + 1] << 2;
-            cols.b = kb_pal[index + 2] << 2;
-
-            pal_colors.push_back( cols );
-        }
-
-        Surface::SetDefaultPalette( &pal_colors[0], pal_colors.size() );
-    }
-
-    RGBA GetColor( u32 index )
-    {
-        return index < pal_colors.size() ? RGBA( pal_colors[index].r, pal_colors[index].g, pal_colors[index].b ) : RGBA( 0, 0, 0 );
-    }
-}
 
 int main( int argc, char ** argv )
 {
@@ -78,7 +44,9 @@ int main( int argc, char ** argv )
     std::string prefix( argv[2] );
     std::string shortname( argv[1] );
 
+    bool debugMode = false;
     if ( shortname == "-d" ) {
+        debugMode = true;
     }
 
     shortname.replace( shortname.find( "." ), 4, "" );
@@ -93,15 +61,18 @@ int main( int argc, char ** argv )
     int count = sf.getLE16();
     int width = sf.getLE16();
     int height = sf.getLE16();
-    std::vector<u8> buf = sf.getRaw( size );
-
-    SDL::Init();
-    H2Palette::Init();
+    std::vector<uint8_t> buf = sf.getRaw( width * height * count );
+    if ( debugMode ) {
+        std::cout << "Size of stream " << size << "(" << buf.size() << ")" << std::endl;
+        std::cout << "Count of images " << count << "(" << width << "," << height << ")" << std::endl;
+    }
 
     for ( int cur = 0; cur < count; ++cur ) {
-        u32 offset = width * height * cur;
+        uint32_t offset = width * height * cur;
         if ( offset < buf.size() ) {
-            Surface sf( &buf[offset], width, height, 1, false );
+            fheroes2::Image image( width, height );
+            memcpy( image.image(), &buf[offset], static_cast<size_t>( width * height ) );
+            std::fill( image.transform(), image.transform() + width * height, 0 );
 
             std::ostringstream stream;
             stream << std::setw( 3 ) << std::setfill( '0' ) << cur;
@@ -112,13 +83,16 @@ int main( int argc, char ** argv )
 #else
             dstfile += ".png";
 #endif
-            if ( !sf.Save( dstfile.c_str() ) )
+            if ( debugMode ) {
+                std::cout << "Saving " << dstfile << std::endl;
+            }
+
+            if ( !fheroes2::Save( image, dstfile, 0 ) )
                 std::cout << "error" << std::endl;
         }
     }
 
     sf.close();
     std::cout << "expand to: " << prefix << std::endl;
-    SDL::Quit();
     return EXIT_SUCCESS;
 }

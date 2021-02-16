@@ -21,6 +21,7 @@
  ***************************************************************************/
 
 #include <algorithm>
+#include <cassert>
 
 #include "battle_arena.h"
 #include "battle_bridge.h"
@@ -31,7 +32,8 @@
 #include "battle_tower.h"
 #include "battle_troop.h"
 #include "kingdom.h"
-#include "settings.h"
+#include "logging.h"
+#include "rand.h"
 #include "spell.h"
 #include "world.h"
 
@@ -53,7 +55,7 @@ namespace
             return std::make_pair( 1, 3 );
         }
 
-        DEBUG( DBG_BATTLE, DBG_TRACE, "damage_range: unexpected spellPower value: " << spellPower << " for commander " << commander );
+        DEBUG_LOG( DBG_BATTLE, DBG_TRACE, "damage_range: unexpected spellPower value: " << spellPower << " for commander " << commander );
         return std::make_pair( 0, 0 );
     }
 }
@@ -181,7 +183,8 @@ void Battle::Arena::ApplyActionSpellCast( Command & cmd )
 
     if ( current_commander && current_commander->HaveSpellBook() && !current_commander->Modes( Heroes::SPELLCASTED ) && current_commander->CanCastSpell( spell )
          && spell.isCombat() ) {
-        DEBUG( DBG_BATTLE, DBG_TRACE, current_commander->GetName() << ", color: " << Color::String( current_commander->GetColor() ) << ", spell: " << spell.GetName() );
+        DEBUG_LOG( DBG_BATTLE, DBG_TRACE,
+                   current_commander->GetName() << ", color: " << Color::String( current_commander->GetColor() ) << ", spell: " << spell.GetName() );
 
         // uniq spells action
         switch ( spell() ) {
@@ -216,9 +219,9 @@ void Battle::Arena::ApplyActionSpellCast( Command & cmd )
         usage_spells.Append( spell );
     }
     else {
-        DEBUG( DBG_BATTLE, DBG_INFO,
-               spell.GetName() << ", "
-                               << "incorrect param" );
+        DEBUG_LOG( DBG_BATTLE, DBG_INFO,
+                   spell.GetName() << ", "
+                                   << "incorrect param" );
     }
 }
 
@@ -233,7 +236,7 @@ void Battle::Arena::ApplyActionAttack( Command & cmd )
     Battle::Unit * b2 = GetTroopUID( uid2 );
 
     if ( b1 && b1->isValid() && b2 && b2->isValid() && ( b1->GetCurrentColor() != b2->GetColor() ) ) {
-        DEBUG( DBG_BATTLE, DBG_TRACE, b1->String() << " to " << b2->String() );
+        DEBUG_LOG( DBG_BATTLE, DBG_TRACE, b1->String() << " to " << b2->String() );
 
         // reset blind
         if ( b2->Modes( SP_BLIND ) )
@@ -254,7 +257,7 @@ void Battle::Arena::ApplyActionAttack( Command & cmd )
 
                 // twice attack
                 if ( b1->isValid() && b1->isTwiceAttack() && !b1->Modes( SP_BLIND | IS_PARALYZE_MAGIC ) ) {
-                    DEBUG( DBG_BATTLE, DBG_TRACE, "twice attack" );
+                    DEBUG_LOG( DBG_BATTLE, DBG_TRACE, "twice attack" );
                     BattleProcess( *b1, *b2 );
                 }
             }
@@ -263,19 +266,19 @@ void Battle::Arena::ApplyActionAttack( Command & cmd )
             b2->UpdateDirection();
         }
         else {
-            DEBUG( DBG_BATTLE, DBG_WARN,
-                   "incorrect param"
-                       << ": " << b1->String( true ) << " and " << b2->String( true ) );
+            DEBUG_LOG( DBG_BATTLE, DBG_WARN,
+                       "incorrect param"
+                           << ": " << b1->String( true ) << " and " << b2->String( true ) );
         }
     }
     else {
-        DEBUG( DBG_BATTLE, DBG_WARN,
-               "incorrect param"
-                   << ": "
-                   << "uid: "
-                   << "0x" << std::setw( 8 ) << std::setfill( '0' ) << std::hex << uid1 << ", "
-                   << "uid: "
-                   << "0x" << std::setw( 8 ) << std::setfill( '0' ) << std::hex << uid2 );
+        DEBUG_LOG( DBG_BATTLE, DBG_WARN,
+                   "incorrect param"
+                       << ": "
+                       << "uid: "
+                       << "0x" << std::setw( 8 ) << std::setfill( '0' ) << std::hex << uid1 << ", "
+                       << "uid: "
+                       << "0x" << std::setw( 8 ) << std::setfill( '0' ) << std::hex << uid2 );
     }
 }
 
@@ -293,8 +296,9 @@ void Battle::Arena::ApplyActionMove( Command & cmd )
         const s32 head = b->GetHeadIndex();
         pos1 = Position::GetCorrect( *b, dst );
 
-        DEBUG( DBG_BATTLE, DBG_TRACE,
-               b->String() << ", dst: " << dst << ", (head: " << pos1.GetHead()->GetIndex() << ", tail: " << ( b->isWide() ? pos1.GetTail()->GetIndex() : -1 ) << ")" );
+        DEBUG_LOG( DBG_BATTLE, DBG_TRACE,
+                   b->String() << ", dst: " << dst << ", (head: " << pos1.GetHead()->GetIndex() << ", tail: " << ( b->isWide() ? pos1.GetTail()->GetIndex() : -1 )
+                               << ")" );
 
         if ( b->isFlying() ) {
             b->UpdateDirection( pos1.GetRect() );
@@ -317,9 +321,9 @@ void Battle::Arena::ApplyActionMove( Command & cmd )
                     path.push_back( cmd.GetValue() );
 
             if ( path.empty() ) {
-                DEBUG( DBG_BATTLE, DBG_WARN,
-                       "path empty, " << b->String() << " to "
-                                      << "dst: " << dst );
+                DEBUG_LOG( DBG_BATTLE, DBG_WARN,
+                           "path empty, " << b->String() << " to "
+                                          << "dst: " << dst );
                 return;
             }
 
@@ -365,10 +369,10 @@ void Battle::Arena::ApplyActionMove( Command & cmd )
         b->UpdateDirection();
     }
     else {
-        DEBUG( DBG_BATTLE, DBG_WARN,
-               "incorrect param"
-                   << ": "
-                   << "uid: " << uid << ", dst: " << dst );
+        DEBUG_LOG( DBG_BATTLE, DBG_WARN,
+                   "incorrect param"
+                       << ": "
+                       << "uid: " << uid << ", dst: " << dst );
     }
 }
 
@@ -393,17 +397,17 @@ void Battle::Arena::ApplyActionSkip( Command & cmd )
             if ( interface )
                 interface->RedrawActionSkipStatus( *battle );
 
-            DEBUG( DBG_BATTLE, DBG_TRACE, battle->String() );
+            DEBUG_LOG( DBG_BATTLE, DBG_TRACE, battle->String() );
         }
         else {
-            DEBUG( DBG_BATTLE, DBG_WARN, "uid: " << uid << " moved" );
+            DEBUG_LOG( DBG_BATTLE, DBG_WARN, "uid: " << uid << " moved" );
         }
     }
     else {
-        DEBUG( DBG_BATTLE, DBG_WARN,
-               "incorrect param"
-                   << ": "
-                   << "uid: " << uid );
+        DEBUG_LOG( DBG_BATTLE, DBG_WARN,
+                   "incorrect param"
+                       << ": "
+                       << "uid: " << uid );
     }
 }
 
@@ -420,18 +424,18 @@ void Battle::Arena::ApplyActionEnd( Command & cmd )
             if ( battle->Modes( TR_SKIPMOVE ) && interface )
                 interface->RedrawActionSkipStatus( *battle );
 
-            DEBUG( DBG_BATTLE, DBG_TRACE, battle->String() );
+            DEBUG_LOG( DBG_BATTLE, DBG_TRACE, battle->String() );
         }
         else {
-            DEBUG( DBG_BATTLE, DBG_INFO, "uid: " << uid << " moved" );
+            DEBUG_LOG( DBG_BATTLE, DBG_INFO, "uid: " << uid << " moved" );
         }
     }
     else {
-        DEBUG( DBG_BATTLE, DBG_INFO,
-               "incorrect param"
-                   << ": "
-                   << "uid: "
-                   << "0x" << std::setw( 8 ) << std::setfill( '0' ) << std::hex << uid );
+        DEBUG_LOG( DBG_BATTLE, DBG_INFO,
+                   "incorrect param"
+                       << ": "
+                       << "uid: "
+                       << "0x" << std::setw( 8 ) << std::setfill( '0' ) << std::hex << uid );
     }
 }
 
@@ -459,14 +463,14 @@ void Battle::Arena::ApplyActionMorale( Command & cmd )
         if ( interface )
             interface->RedrawActionMorale( *b, morale );
 
-        DEBUG( DBG_BATTLE, DBG_TRACE, ( morale ? "good" : "bad" ) << " to " << b->String() );
+        DEBUG_LOG( DBG_BATTLE, DBG_TRACE, ( morale ? "good" : "bad" ) << " to " << b->String() );
     }
     else {
-        DEBUG( DBG_BATTLE, DBG_WARN,
-               "incorrect param"
-                   << ": "
-                   << "uid: "
-                   << "0x" << std::setw( 8 ) << std::setfill( '0' ) << std::hex << uid );
+        DEBUG_LOG( DBG_BATTLE, DBG_WARN,
+                   "incorrect param"
+                       << ": "
+                       << "uid: "
+                       << "0x" << std::setw( 8 ) << std::setfill( '0' ) << std::hex << uid );
     }
 }
 
@@ -479,10 +483,10 @@ void Battle::Arena::ApplyActionRetreat( const Command & /*cmd*/ )
         else if ( army2->GetColor() == current_color ) {
             result_game.army2 = RESULT_RETREAT;
         }
-        DEBUG( DBG_BATTLE, DBG_TRACE, "color: " << Color::String( current_color ) );
+        DEBUG_LOG( DBG_BATTLE, DBG_TRACE, "color: " << Color::String( current_color ) );
     }
     else {
-        DEBUG( DBG_BATTLE, DBG_WARN, "CanRetreatOpponent check failed" );
+        DEBUG_LOG( DBG_BATTLE, DBG_WARN, "CanRetreatOpponent check failed" );
     }
 }
 
@@ -507,11 +511,11 @@ void Battle::Arena::ApplyActionSurrender( const Command & /*cmd*/ )
                 world.GetKingdom( current_color ).OddFundsResource( cost );
                 world.GetKingdom( army1->GetColor() ).AddFundsResource( cost );
             }
-            DEBUG( DBG_BATTLE, DBG_TRACE, "color: " << Color::String( current_color ) );
+            DEBUG_LOG( DBG_BATTLE, DBG_TRACE, "color: " << Color::String( current_color ) );
         }
     }
     else {
-        DEBUG( DBG_BATTLE, DBG_WARN, "incorrect param" );
+        DEBUG_LOG( DBG_BATTLE, DBG_WARN, "incorrect param" );
     }
 }
 
@@ -587,7 +591,7 @@ Battle::TargetsInfo Battle::Arena::GetTargetsForDamage( const Unit & attacker, U
             }
         }
         else {
-            DEBUG( DBG_BATTLE, DBG_TRACE, "Lich shot at a cell where no mosnter exists: " << dst );
+            DEBUG_LOG( DBG_BATTLE, DBG_TRACE, "Lich shot at a cell where no mosnter exists: " << dst );
         }
     }
 
@@ -596,7 +600,7 @@ Battle::TargetsInfo Battle::Arena::GetTargetsForDamage( const Unit & attacker, U
 
 void Battle::Arena::TargetsApplySpell( const HeroBase * hero, const Spell & spell, TargetsInfo & targets )
 {
-    DEBUG( DBG_BATTLE, DBG_TRACE, "targets: " << targets.size() );
+    DEBUG_LOG( DBG_BATTLE, DBG_TRACE, "targets: " << targets.size() );
 
     TargetsInfo::iterator it = targets.begin();
 
@@ -607,10 +611,83 @@ void Battle::Arena::TargetsApplySpell( const HeroBase * hero, const Spell & spel
     }
 }
 
+std::vector<Battle::Unit *> Battle::Arena::FindChainLightningTargetIndexes( const HeroBase * hero, Unit * firstUnit )
+{
+    std::vector<Battle::Unit *> result = {firstUnit};
+    std::vector<Battle::Unit *> ignoredTroops = {firstUnit};
+
+    std::vector<Battle::Unit *> foundTroops = board.GetNearestTroops( result.back(), ignoredTroops );
+
+    const int heroSpellPower = hero ? hero->GetPower() : 0;
+
+    // Filter those which are fully immuned
+    for ( size_t i = 0; i < foundTroops.size(); ) {
+        if ( foundTroops[i]->GetMagicResist( Spell::CHAINLIGHTNING, heroSpellPower ) >= 100 ) {
+            ignoredTroops.push_back( foundTroops[i] );
+            foundTroops.erase( foundTroops.begin() + i );
+        }
+        else {
+            ++i;
+        }
+    }
+
+    while ( result.size() != CHAIN_LIGHTNING_CREATURE_COUNT && !foundTroops.empty() ) {
+        bool targetFound = false;
+        for ( size_t i = 0; i < foundTroops.size(); ++i ) {
+            const int32_t resist = foundTroops[i]->GetMagicResist( Spell::CHAINLIGHTNING, heroSpellPower );
+            assert( resist >= 0 );
+            if ( resist < static_cast<int32_t>( Rand::Get( 1, 100 ) ) ) {
+                ignoredTroops.push_back( foundTroops[i] );
+                result.push_back( foundTroops[i] );
+                foundTroops.erase( foundTroops.begin() + i );
+                targetFound = true;
+                break;
+            }
+        }
+
+        // All targets are resisted. Choosing the nearest one.
+        if ( !targetFound ) {
+            ignoredTroops.push_back( foundTroops.front() );
+            result.push_back( foundTroops.front() );
+            foundTroops.erase( foundTroops.begin() );
+        }
+
+        if ( result.size() != CHAIN_LIGHTNING_CREATURE_COUNT ) {
+            foundTroops = board.GetNearestTroops( result.back(), ignoredTroops );
+        }
+    }
+
+    return result;
+}
+
+Battle::TargetsInfo Battle::Arena::TargetsForChainLightning( const HeroBase * hero, int32_t attackedTroopIndex )
+{
+    Unit * unit = GetTroopBoard( attackedTroopIndex );
+    if ( unit == nullptr ) {
+        assert( 0 );
+        return TargetsInfo();
+    }
+
+    TargetsInfo targets;
+    const std::vector<Unit *> targetUnits = FindChainLightningTargetIndexes( hero, unit );
+    for ( size_t i = 0; i < targetUnits.size(); ++i ) {
+        targets.emplace_back();
+        TargetInfo & res = targets.back();
+
+        res.defender = targetUnits[i];
+        // store temp priority for calculate damage
+        res.damage = i;
+    }
+    return targets;
+}
+
 Battle::TargetsInfo Battle::Arena::GetTargetsForSpells( const HeroBase * hero, const Spell & spell, s32 dst )
 {
     TargetsInfo targets;
     targets.reserve( 8 );
+
+    bool ignoreMagicResistance = false;
+    bool playResistSound = true;
 
     TargetInfo res;
     Unit * target = GetTroopBoard( dst );
@@ -646,52 +723,10 @@ Battle::TargetsInfo Battle::Arena::GetTargetsForSpells( const HeroBase * hero, c
         // check other spells
         switch ( spell() ) {
         case Spell::CHAINLIGHTNING: {
-            uint32_t currentMonsterPos = dst;
-
-            Indexes trgts;
-            trgts.reserve( 12 );
-            trgts.push_back( currentMonsterPos );
-
-            Indexes ignoredMonster;
-            ignoredMonster.push_back( currentMonsterPos );
-
-            // find targets
-            while ( trgts.size() < 4 ) {
-                const Indexes nearestPosIds = board.GetNearestTroopIndexes( currentMonsterPos, &ignoredMonster );
-                if ( nearestPosIds.empty() )
-                    break;
-
-                Indexes sortedIds;
-
-                for ( size_t monsterId = 0; monsterId < nearestPosIds.size(); ++monsterId ) {
-                    const Unit * targetUnit = GetTroopBoard( nearestPosIds[monsterId] );
-                    if ( targetUnit != NULL && ( targetUnit->GetMagicResist( spell, hero ? hero->GetPower() : 0 ) < 100 ) ) {
-                        sortedIds.push_back( nearestPosIds[monsterId] );
-                    }
-                    ignoredMonster.push_back( nearestPosIds[monsterId] );
-                }
-
-                if ( sortedIds.empty() ) {
-                    continue;
-                }
-
-                const int32_t * monsterPos = Rand::Get( sortedIds );
-                const uint32_t chosenMonsterPos = monsterPos ? *monsterPos : sortedIds.front();
-                trgts.push_back( chosenMonsterPos );
-                currentMonsterPos = chosenMonsterPos;
-            }
-
-            // save targets
-            for ( Indexes::iterator it = trgts.begin(); it != trgts.end(); ++it ) {
-                Unit * targetDefender = GetTroopBoard( *it );
-
-                if ( targetDefender ) {
-                    res.defender = targetDefender;
-                    // store temp priority for calculate damage
-                    res.damage = std::distance( trgts.begin(), it );
-                    targets.push_back( res );
-                }
-            }
+            TargetsInfo targetsForSpell = TargetsForChainLightning( hero, dst );
+            targets.insert( targets.end(), targetsForSpell.begin(), targetsForSpell.end() );
+            ignoreMagicResistance = true;
+            playResistSound = false;
         } break;
 
         // check abroads
@@ -711,6 +746,7 @@ Battle::TargetsInfo Battle::Arena::GetTargetsForSpells( const HeroBase * hero, c
 
             // unique
             targets.resize( std::distance( targets.begin(), std::unique( targets.begin(), targets.end() ) ) );
+            playResistSound = false;
         } break;
 
         // check all troops
@@ -737,25 +773,28 @@ Battle::TargetsInfo Battle::Arena::GetTargetsForSpells( const HeroBase * hero, c
 
             // unique
             targets.resize( std::distance( targets.begin(), std::unique( targets.begin(), targets.end() ) ) );
+            playResistSound = false;
         } break;
 
         default:
             break;
         }
 
-    // remove resistent magic troop
-    TargetsInfo::iterator it = targets.begin();
-    while ( it != targets.end() ) {
-        const u32 resist = ( *it ).defender->GetMagicResist( spell, hero ? hero->GetPower() : 0 );
+    // Remove resistent magic troop
+    if ( !ignoreMagicResistance ) {
+        TargetsInfo::iterator it = targets.begin();
+        while ( it != targets.end() ) {
+            const u32 resist = ( *it ).defender->GetMagicResist( spell, hero ? hero->GetPower() : 0 );
 
-        if ( 0 < resist && 100 > resist && resist >= Rand::Get( 1, 100 ) ) {
-            if ( interface )
-                interface->RedrawActionResistSpell( *( *it ).defender );
+            if ( 0 < resist && 100 > resist && resist >= Rand::Get( 1, 100 ) ) {
+                if ( interface )
+                    interface->RedrawActionResistSpell( *( *it ).defender, playResistSound );
 
-            it = targets.erase( it );
+                it = targets.erase( it );
+            }
+            else
+                ++it;
         }
-        else
-            ++it;
     }
 
     return targets;
@@ -770,7 +809,7 @@ void Battle::Arena::ApplyActionTower( Command & cmd )
     Battle::Unit * b2 = GetTroopUID( uid );
 
     if ( b2 && b2->isValid() && tower ) {
-        DEBUG( DBG_BATTLE, DBG_TRACE, "tower: " << type << ", attack to " << b2->String() );
+        DEBUG_LOG( DBG_BATTLE, DBG_TRACE, "tower: " << type << ", attack to " << b2->String() );
 
         TargetInfo target;
         target.defender = b2;
@@ -786,11 +825,11 @@ void Battle::Arena::ApplyActionTower( Command & cmd )
             b2->ResetBlind();
     }
     else {
-        DEBUG( DBG_BATTLE, DBG_WARN,
-               "incorrect param"
-                   << ": "
-                   << "tower: " << type << ", uid: "
-                   << "0x" << std::setw( 8 ) << std::setfill( '0' ) << std::hex << uid );
+        DEBUG_LOG( DBG_BATTLE, DBG_WARN,
+                   "incorrect param"
+                       << ": "
+                       << "tower: " << type << ", uid: "
+                       << "0x" << std::setw( 8 ) << std::setfill( '0' ) << std::hex << uid );
     }
 }
 
@@ -807,12 +846,12 @@ void Battle::Arena::ApplyActionCatapult( Command & cmd )
                 if ( interface )
                     interface->RedrawActionCatapult( target );
                 SetCastleTargetValue( target, GetCastleTargetValue( target ) - damage );
-                DEBUG( DBG_BATTLE, DBG_TRACE, "target: " << target );
+                DEBUG_LOG( DBG_BATTLE, DBG_TRACE, "target: " << target );
             }
         }
     }
     else {
-        DEBUG( DBG_BATTLE, DBG_WARN, "incorrect param" );
+        DEBUG_LOG( DBG_BATTLE, DBG_WARN, "incorrect param" );
     }
 }
 
@@ -820,7 +859,7 @@ void Battle::Arena::ApplyActionAutoBattle( Command & cmd )
 {
     const int color = cmd.GetValue();
     if ( current_color != color ) {
-        DEBUG( DBG_BATTLE, DBG_WARN, "incorrect param" );
+        DEBUG_LOG( DBG_BATTLE, DBG_WARN, "incorrect param" );
         return;
     }
 
@@ -879,10 +918,10 @@ void Battle::Arena::ApplyActionSpellTeleport( Command & cmd )
         b->SetPosition( pos );
         b->UpdateDirection();
 
-        DEBUG( DBG_BATTLE, DBG_TRACE, "spell: " << spell.GetName() << ", src: " << src << ", dst: " << dst );
+        DEBUG_LOG( DBG_BATTLE, DBG_TRACE, "spell: " << spell.GetName() << ", src: " << src << ", dst: " << dst );
     }
     else {
-        DEBUG( DBG_BATTLE, DBG_WARN, "spell: " << spell.GetName() << " false" );
+        DEBUG_LOG( DBG_BATTLE, DBG_WARN, "spell: " << spell.GetName() << " false" );
     }
 }
 
@@ -894,7 +933,7 @@ void Battle::Arena::ApplyActionSpellEarthQuake( const Command & /*cmd*/ )
     }
 
     const HeroBase * commander = GetCurrentCommander();
-    const std::pair<int, int> range = commander ? getEarthquakeDamageRange( commander ) : std::make_pair( 0 , 0 );
+    const std::pair<int, int> range = commander ? getEarthquakeDamageRange( commander ) : std::make_pair( 0, 0 );
     const std::vector<int> wallHexPositions = {FIRST_WALL_HEX_POSITION, SECOND_WALL_HEX_POSITION, THIRD_WALL_HEX_POSITION, FORTH_WALL_HEX_POSITION};
     for ( int position : wallHexPositions ) {
         if ( 0 != board[position].GetObject() ) {
@@ -907,10 +946,8 @@ void Battle::Arena::ApplyActionSpellEarthQuake( const Command & /*cmd*/ )
     if ( towers[2] && towers[2]->isValid() && Rand::Get( 1 ) )
         towers[2]->SetDestroy();
 
-    DEBUG( DBG_BATTLE, DBG_TRACE, "spell: " << Spell( Spell::EARTHQUAKE ).GetName() << ", targets: " << targets.size() );
+    DEBUG_LOG( DBG_BATTLE, DBG_TRACE, "spell: " << Spell( Spell::EARTHQUAKE ).GetName() << ", targets: " << targets.size() );
 }
-
-
 
 void Battle::Arena::ApplyActionSpellMirrorImage( Command & cmd )
 {
@@ -930,7 +967,7 @@ void Battle::Arena::ApplyActionSpellMirrorImage( Command & cmd )
         if ( it != distances.end() ) {
             const Position pos = Position::GetCorrect( *troop, *it );
             const s32 dst = pos.GetHead()->GetIndex();
-            DEBUG( DBG_BATTLE, DBG_TRACE, "set position: " << dst );
+            DEBUG_LOG( DBG_BATTLE, DBG_TRACE, "set position: " << dst );
             if ( interface )
                 interface->RedrawActionMirrorImageSpell( *troop, pos );
             Unit * mirror = CreateMirrorImage( *troop, dst );
@@ -940,10 +977,10 @@ void Battle::Arena::ApplyActionSpellMirrorImage( Command & cmd )
         else {
             if ( interface )
                 interface->SetStatus( _( "spell failed!" ), true );
-            DEBUG( DBG_BATTLE, DBG_WARN, "new position not found!" );
+            DEBUG_LOG( DBG_BATTLE, DBG_WARN, "new position not found!" );
         }
     }
     else {
-        DEBUG( DBG_BATTLE, DBG_WARN, "spell: " << Spell( Spell::MIRRORIMAGE ).GetName() << " false" );
+        DEBUG_LOG( DBG_BATTLE, DBG_WARN, "spell: " << Spell( Spell::MIRRORIMAGE ).GetName() << " false" );
     }
 }

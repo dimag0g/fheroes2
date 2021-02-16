@@ -43,14 +43,24 @@ namespace fheroes2
             return _isFullScreen;
         }
 
-        virtual std::vector<std::pair<int, int> > getAvailableResolutions() const
+        virtual std::vector<Size> getAvailableResolutions() const
         {
-            return std::vector<std::pair<int, int> >();
+            return std::vector<Size>();
         }
 
         virtual void setTitle( const std::string & ) {}
 
         virtual void setIcon( const Image & ) {}
+
+        virtual fheroes2::Rect getActiveWindowROI() const
+        {
+            return fheroes2::Rect();
+        }
+
+        virtual fheroes2::Size getCurrentScreenResolution() const
+        {
+            return fheroes2::Size();
+        }
 
     protected:
         BaseRenderEngine()

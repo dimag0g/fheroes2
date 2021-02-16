@@ -23,43 +23,9 @@
 #ifndef H2SYSTEM_H
 #define H2SYSTEM_H
 
-#include <iostream>
-#include <list>
-#include <sstream>
-#include <string>
-
-#if defined( ANDROID )
-#include <android/log.h>
-namespace std
-{
-    static const char * android_endl = "\n";
-}
-#define endl android_endl
-#define COUT( x )                                                                                                                                                        \
-    {                                                                                                                                                                    \
-        std::ostringstream osss;                                                                                                                                         \
-        osss << x;                                                                                                                                                       \
-        __android_log_print( ANDROID_LOG_INFO, "SDLHeroes2", "%s", osss.str().c_str() );                                                                                 \
-    }
-#else
-#include <fstream> //!
-extern std::ofstream *log_file;
-#define COUT( x )                                                                                                                                                        \
-    {                                                                                                                                                                    \
-        *log_file << x << std::endl; log_file->flush();                                                                                                                                \
-    }
-#endif
-
-#define VERBOSE( x )                                                                                                                                                     \
-    {                                                                                                                                                                    \
-        COUT( System::GetTime() << ": [VERBOSE]\t" << __FUNCTION__ << ":  " << x );                                                                                      \
-    }
-#define ERROR( x )                                                                                                                                                       \
-    {                                                                                                                                                                    \
-        COUT( System::GetTime() << ": [ERROR]\t" << __FUNCTION__ << ":  " << x );                                                                                        \
-    }
-
 #include "dir.h"
+
+
 
 namespace System
 {
@@ -74,8 +40,6 @@ namespace System
 
     std::string GetDirname( const std::string & );
     std::string GetBasename( const std::string & );
-
-    std::string GetTime( void );
 
     void SetLocale( int, const char * );
     std::string GetMessageLocale( int /* 3: en_us.utf-8, 2: en_us, 1: en */ );

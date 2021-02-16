@@ -148,9 +148,11 @@ u32 Castle::OpenTown( void )
     Cursor & cursor = Cursor::Get();
     cursor.Hide();
 
-    Dialog::FrameBorder background( Size( fheroes2::Display::DEFAULT_WIDTH, fheroes2::Display::DEFAULT_HEIGHT ) );
+    const fheroes2::ImageRestorer restorer( display, ( display.width() - fheroes2::Display::DEFAULT_WIDTH ) / 2,
+                                            ( display.height() - fheroes2::Display::DEFAULT_HEIGHT ) / 2, fheroes2::Display::DEFAULT_WIDTH,
+                                            fheroes2::Display::DEFAULT_HEIGHT );
 
-    const Point & cur_pt = background.GetArea();
+    const Point cur_pt( restorer.x(), restorer.y() );
     Point dst_pt( cur_pt );
 
     fheroes2::Blit( fheroes2::AGG::GetICN( ICN::CASLWIND, 0 ), display, dst_pt.x, dst_pt.y );
@@ -303,7 +305,7 @@ u32 Castle::OpenTown( void )
         dst_pt.y = cur_pt.y + 168;
         text.Blit( dst_pt );
 
-        text.Set( GetString( captain.GetAttack() ) );
+        text.Set( std::to_string( captain.GetAttack() ) );
         dst_pt.x += 90;
         text.Blit( dst_pt );
 
@@ -312,7 +314,7 @@ u32 Castle::OpenTown( void )
         dst_pt.y += 12;
         text.Blit( dst_pt );
 
-        text.Set( GetString( captain.GetDefense() ) );
+        text.Set( std::to_string( captain.GetDefense() ) );
         dst_pt.x += 90;
         text.Blit( dst_pt );
 
@@ -321,7 +323,7 @@ u32 Castle::OpenTown( void )
         dst_pt.y += 12;
         text.Blit( dst_pt );
 
-        text.Set( GetString( captain.GetPower() ) );
+        text.Set( std::to_string( captain.GetPower() ) );
         dst_pt.x += 90;
         text.Blit( dst_pt );
 
@@ -330,7 +332,7 @@ u32 Castle::OpenTown( void )
         dst_pt.y += 12;
         text.Blit( dst_pt );
 
-        text.Set( GetString( captain.GetKnowledge() ) );
+        text.Set( std::to_string( captain.GetKnowledge() ) );
         dst_pt.x += 90;
         text.Blit( dst_pt );
 

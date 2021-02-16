@@ -27,6 +27,7 @@
 #include "ai.h"
 #include "army.h"
 #include "army_troop.h"
+#include "audio_mixer.h"
 #include "audio_music.h"
 #include "battle_arena.h"
 #include "battle_army.h"
@@ -40,9 +41,9 @@
 #include "castle.h"
 #include "cursor.h"
 #include "ground.h"
+#include "logging.h"
 #include "mus.h"
 #include "race.h"
-#include "settings.h"
 #include "speed.h"
 #include "tools.h"
 #include "world.h"
@@ -290,12 +291,12 @@ Battle::Arena::Arena( Army & a1, Army & a2, s32 index, bool local )
         fheroes2::Display & display = fheroes2::Display::instance();
 
         cursor.Hide();
-        cursor.SetThemes( Cursor::WAR_NONE );
+        cursor.SetThemes( Cursor::WAR_POINTER );
 
         if ( conf.ExtGameUseFade() )
             fheroes2::FadeDisplay();
 
-        interface->Redraw();
+        interface->fullRedraw();
         cursor.Show();
         display.render();
 
@@ -328,7 +329,7 @@ void Battle::Arena::TurnTroop( Unit * current_troop )
     end_turn = false;
     const bool isImmovable = current_troop->Modes( SP_BLIND | IS_PARALYZE_MAGIC );
 
-    DEBUG( DBG_BATTLE, DBG_TRACE, current_troop->String( true ) );
+    DEBUG_LOG( DBG_BATTLE, DBG_TRACE, current_troop->String( true ) );
 
     // morale check right before the turn
     if ( !isImmovable ) {
@@ -390,7 +391,7 @@ void Battle::Arena::TurnTroop( Unit * current_troop )
 
         board.Reset();
 
-        DELAY( 10 );
+        fheroes2::delayforMs( 10 );
     }
 }
 
@@ -404,7 +405,7 @@ void Battle::Arena::Turns( void )
     const Settings & conf = Settings::Get();
 
     ++current_turn;
-    DEBUG( DBG_BATTLE, DBG_TRACE, current_turn );
+    DEBUG_LOG( DBG_BATTLE, DBG_TRACE, current_turn );
 
     if ( interface && conf.Music() && !Music::isPlaying() )
         AGG::PlayMusic( MUS::GetBattleRandom() );
@@ -500,7 +501,7 @@ void Battle::Arena::Turns( void )
 
 void Battle::Arena::RemoteTurn( const Unit & b, Actions & a )
 {
-    DEBUG( DBG_BATTLE, DBG_WARN, "switch to AI turn" );
+    DEBUG_LOG( DBG_BATTLE, DBG_WARN, "switch to AI turn" );
     AI::Get().BattleTurn( *this, b, a );
 }
 
@@ -559,7 +560,7 @@ Battle::Indexes Battle::Arena::GetPath( const Unit & b, const Position & dst )
         std::stringstream ss;
         for ( u32 ii = 0; ii < result.size(); ++ii )
             ss << result[ii] << ", ";
-        DEBUG( DBG_BATTLE, DBG_TRACE, ss.str() );
+        DEBUG_LOG( DBG_BATTLE, DBG_TRACE, ss.str() );
     }
 
     return result;
@@ -731,7 +732,7 @@ bool Battle::Arena::CanSurrenderOpponent( int color ) const
 bool Battle::Arena::CanRetreatOpponent( int color ) const
 {
     const HeroBase * hero = army1->GetColor() == color ? army1->GetCommander() : army2->GetCommander();
-    return hero && hero->isHeroes() && NULL == hero->inCastle() && world.GetKingdom( hero->GetColor() ).GetCastles().size();
+    return hero && hero->isHeroes() && NULL == hero->inCastle();
 }
 
 bool Battle::Arena::isSpellcastDisabled() const
@@ -1047,7 +1048,7 @@ Battle::Unit * Battle::Arena::CreateElemental( const Spell & spell )
     const s32 pos = GetFreePositionNearHero( current_color );
 
     if ( 0 > pos || !hero ) {
-        DEBUG( DBG_BATTLE, DBG_WARN, "internal error" );
+        DEBUG_LOG( DBG_BATTLE, DBG_WARN, "internal error" );
         return NULL;
     }
 
@@ -1078,18 +1079,18 @@ Battle::Unit * Battle::Arena::CreateElemental( const Spell & spell )
         }
 
     if ( !affect ) {
-        DEBUG( DBG_BATTLE, DBG_WARN, "other elemental summon" );
+        DEBUG_LOG( DBG_BATTLE, DBG_WARN, "other elemental summon" );
         return NULL;
     }
 
     Monster mons( spell );
 
     if ( !mons.isValid() ) {
-        DEBUG( DBG_BATTLE, DBG_WARN, "unknown id" );
+        DEBUG_LOG( DBG_BATTLE, DBG_WARN, "unknown id" );
         return NULL;
     }
 
-    DEBUG( DBG_BATTLE, DBG_TRACE, mons.GetName() << ", position: " << pos );
+    DEBUG_LOG( DBG_BATTLE, DBG_TRACE, mons.GetName() << ", position: " << pos );
     u32 count = spell.ExtraValue() * hero->GetPower();
     u32 acount = hero->HasArtifact( Artifact::BOOK_ELEMENTS );
     if ( acount )
@@ -1103,7 +1104,7 @@ Battle::Unit * Battle::Arena::CreateElemental( const Spell & spell )
         army.push_back( elem );
     }
     else {
-        DEBUG( DBG_BATTLE, DBG_WARN, "is NULL" );
+        DEBUG_LOG( DBG_BATTLE, DBG_WARN, "is NULL" );
     }
 
     return elem;
@@ -1123,116 +1124,52 @@ Battle::Unit * Battle::Arena::CreateMirrorImage( Unit & b, s32 pos )
         GetCurrentForce().push_back( image );
     }
     else {
-        DEBUG( DBG_BATTLE, DBG_WARN, "internal error" );
+        DEBUG_LOG( DBG_BATTLE, DBG_WARN, "internal error" );
     }
 
     return image;
 }
 
-u32 Battle::Arena::GetObstaclesPenalty( const Unit & attacker, const Unit & defender ) const
+bool Battle::Arena::IsShootingPenalty( const Unit & attacker, const Unit & defender ) const
 {
     if ( defender.Modes( CAP_TOWER ) || attacker.Modes( CAP_TOWER ) )
-        return 0;
+        return false;
 
     // check golden bow artifact
-    const HeroBase * enemy = attacker.GetCommander();
-    if ( enemy && enemy->HasArtifact( Artifact::GOLDEN_BOW ) )
-        return 0;
+    const HeroBase * hero = attacker.GetCommander();
+    if ( hero && hero->HasArtifact( Artifact::GOLDEN_BOW ) )
+        return false;
 
-    u32 result = 0;
-    const u32 step = CELLW / 3;
-
-    if ( castle ) {
-        // archery skill
-        if ( enemy && Skill::Level::NONE != enemy->GetLevelSkill( Skill::Secondary::ARCHERY ) )
-            return 0;
-
-        // attacker is castle owner
-        if ( attacker.GetColor() == castle->GetColor() && !attacker.OutOfWalls() )
-            return 0;
-
-        if ( defender.GetColor() == castle->GetColor() && defender.OutOfWalls() )
-            return 0;
-
-        // check castle walls defensed
-        const Points points = GetLinePoints( attacker.GetBackPoint(), defender.GetBackPoint(), step );
-
-        for ( Points::const_iterator it = points.begin(); it != points.end(); ++it ) {
-            if ( 0 == board[8].GetObject() && ( board[8].GetPos() & *it ) )
-                return 0;
-            else if ( 0 == board[29].GetObject() && ( board[29].GetPos() & *it ) )
-                return 0;
-            else if ( 0 == board[73].GetObject() && ( board[73].GetPos() & *it ) )
-                return 0;
-            else if ( 0 == board[96].GetObject() && ( board[96].GetPos() & *it ) )
-                return 0;
-        }
-
-        result = 1;
-    }
-    else if ( Settings::Get().ExtBattleObjectsArchersPenalty() ) {
-        const Points points = GetLinePoints( attacker.GetBackPoint(), defender.GetBackPoint(), step );
-        Indexes indexes;
-        indexes.reserve( points.size() );
-
-        for ( Points::const_iterator it = points.begin(); it != points.end(); ++it ) {
-            const s32 index = board.GetIndexAbsPosition( *it );
-            if ( Board::isValidIndex( index ) )
-                indexes.push_back( index );
-        }
-
-        if ( indexes.size() ) {
-            std::sort( indexes.begin(), indexes.end() );
-            indexes.resize( std::distance( indexes.begin(), std::unique( indexes.begin(), indexes.end() ) ) );
-        }
-
-        for ( Indexes::const_iterator it = indexes.begin(); it != indexes.end(); ++it ) {
-            // obstacles
-            switch ( board[*it].GetObject() ) {
-            // tree
-            case 0x82:
-            // trock
-            case 0x85:
-            // tree
-            case 0x89:
-            // tree
-            case 0x8D:
-            // rock
-            case 0x95:
-            case 0x96:
-            // stub
-            case 0x9A:
-            // dead tree
-            case 0x9B:
-            // tree
-            case 0x9C:
-                ++result;
-                break;
-
-            default:
-                break;
-            }
-        }
-
-        if ( enemy ) {
-            switch ( enemy->GetLevelSkill( Skill::Secondary::ARCHERY ) ) {
-            case Skill::Level::BASIC:
-                if ( result < 2 )
-                    return 0;
-                break;
-            case Skill::Level::ADVANCED:
-                if ( result < 3 )
-                    return 0;
-                break;
-            case Skill::Level::EXPERT:
-                return 0;
-            default:
-                break;
-            }
-        }
+    if ( castle == nullptr ) {
+        return false;
     }
 
-    return result;
+    // archery skill
+    if ( hero && hero->GetLevelSkill( Skill::Secondary::ARCHERY ) != Skill::Level::NONE )
+        return false;
+
+    // attacker is castle owner
+    if ( attacker.GetColor() == castle->GetColor() && !attacker.OutOfWalls() )
+        return false;
+
+    if ( defender.GetColor() == castle->GetColor() && defender.OutOfWalls() )
+        return false;
+
+    // check castle walls defensed
+    const Points points = GetLinePoints( attacker.GetBackPoint(), defender.GetBackPoint(), CELLW / 3 );
+
+    for ( Points::const_iterator it = points.begin(); it != points.end(); ++it ) {
+        if ( 0 == board[8].GetObject() && ( board[8].GetPos() & *it ) )
+            return false;
+        else if ( 0 == board[29].GetObject() && ( board[29].GetPos() & *it ) )
+            return false;
+        else if ( 0 == board[73].GetObject() && ( board[73].GetPos() & *it ) )
+            return false;
+        else if ( 0 == board[96].GetObject() && ( board[96].GetPos() & *it ) )
+            return false;
+    }
+
+    return true;
 }
 
 Battle::Force & Battle::Arena::GetForce1( void )

@@ -148,6 +148,7 @@ public:
     Army & GetArmy( void );
     const Army & GetActualArmy( void ) const;
     Army & GetActualArmy( void );
+    double GetGarrisonStrength() const;
     u32 getMonstersInDwelling( u32 ) const;
     u32 GetActualDwelling( u32 ) const;
 
@@ -194,6 +195,10 @@ public:
     std::string GetStringBuilding( u32 ) const;
     std::string GetDescriptionBuilding( u32 ) const;
 
+    // Returns message displayed in the status bar on the castle view
+    // when hover over the building
+    std::string buildingStatusMessage( const uint32_t buildingId ) const;
+
     static const char * GetStringBuilding( u32, int race );
     static const char * GetDescriptionBuilding( u32, int race );
 
@@ -226,7 +231,7 @@ private:
     void OpenTavern( void );
     void OpenWell( void );
     void OpenMageGuild( const CastleHeroes & heroes );
-    void WellRedrawInfoArea( const Point & cur_pt, const std::vector<RandomMonsterAnimation> & monsterAnimInfo );
+    void WellRedrawInfoArea( const Point & cur_pt, const std::vector<RandomMonsterAnimation> & monsterAnimInfo ) const;
     void JoinRNDArmy( void );
     void PostLoad( void );
 
@@ -250,6 +255,41 @@ private:
 
 namespace CastleDialog
 {
+    // Class used for fading animation
+    class FadeBuilding
+    {
+    public:
+        FadeBuilding()
+            : _alpha( 255 )
+            , _build( BUILD_NOTHING )
+        {}
+
+        void StartFadeBuilding( const uint32_t build );
+
+        bool UpdateFadeBuilding();
+
+        bool IsFadeDone() const
+        {
+            return _alpha >= 255;
+        }
+
+        void StopFadeBuilding();
+
+        uint32_t GetAlpha() const
+        {
+            return _alpha;
+        }
+
+        uint32_t GetBuild() const
+        {
+            return _build;
+        }
+
+    private:
+        uint32_t _alpha;
+        uint32_t _build;
+    };
+
     struct builds_t
     {
         builds_t( building_t b, const Rect & r )
@@ -271,8 +311,7 @@ namespace CastleDialog
         const Rect & GetRect( building_t ) const;
     };
 
-    void RedrawAllBuilding( const Castle &, const Point &, const CacheBuildings & );
-    void RedrawAnimationBuilding( const Castle &, const Point &, const CacheBuildings &, u32 build );
+    void RedrawAllBuilding( const Castle & castle, const Point & dst_pt, const CacheBuildings & orders, const CastleDialog::FadeBuilding & alphaBuilding );
     void RedrawBuildingSpriteToArea( const fheroes2::Sprite &, s32, s32, const Rect &, uint8_t alpha = 255 );
 
     void CastleRedrawBuilding( const Castle &, const Point &, u32 build, u32 frame, uint8_t alpha = 255 );

@@ -41,6 +41,11 @@ namespace Battle
     class Only;
 }
 
+namespace Interface
+{
+    class GameArea;
+}
+
 class Heroes : public HeroBase, public ColorBase
 {
 public:
@@ -274,12 +279,12 @@ public:
     void SetMove( bool );
     bool isAction( void ) const;
     void ResetAction( void );
-    void Action( s32 );
+    void Action( int tileIndex, bool isDestination );
     void ActionNewPosition( void );
     void ApplyPenaltyMovement( uint32_t penalty );
     bool ActionSpellCast( const Spell & );
 
-    void Redraw( fheroes2::Image & dst, int32_t dx, int32_t dy, const Rect & visibleTileROI, bool withShadow ) const;
+    void Redraw( fheroes2::Image & dst, int32_t dx, int32_t dy, const Rect & visibleTileROI, bool withShadow, const Interface::GameArea & gamearea ) const;
     virtual void PortraitRedraw( s32 px, s32 py, PortraitType type, fheroes2::Image & dstsf ) const override;
     int GetSpriteIndex( void ) const;
 
@@ -291,7 +296,6 @@ public:
     void FadeIn( const Point & offset = Point() ) const;
     void Scoute( void ) const;
     int GetScoute( void ) const;
-    int CanScouteTile( s32 ) const;
     u32 GetVisionsDistance( void ) const;
 
     bool isShipMaster( void ) const;

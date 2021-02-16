@@ -33,16 +33,17 @@
 #endif
 
 #include <algorithm>
+#include <cassert>
 #include <cmath>
 #include <set>
 
 namespace
 {
     // Returns nearest screen supported resolution
-    std::pair<int, int> GetNearestResolution( int width, int height, const std::vector<std::pair<int, int> > & resolutions )
+    fheroes2::Size GetNearestResolution( int width, int height, const std::vector<fheroes2::Size> & resolutions )
     {
         if ( resolutions.empty() )
-            return std::make_pair( width, height );
+            return fheroes2::Size( width, height );
 
         if ( width < 1 )
             width = 1;
@@ -54,7 +55,7 @@ namespace
 
         std::vector<double> similarity( resolutions.size(), 0 );
         for ( size_t i = 0; i < resolutions.size(); ++i ) {
-            similarity[i] = std::fabs( resolutions[i].first - x ) / x + std::fabs( resolutions[i].second - y ) / y;
+            similarity[i] = std::fabs( resolutions[i].width - x ) / x + std::fabs( resolutions[i].height - y ) / y;
         }
 
         const std::vector<double>::difference_type id = std::distance( similarity.begin(), std::min_element( similarity.begin(), similarity.end() ) );
@@ -62,26 +63,46 @@ namespace
         return resolutions[id];
     }
 
-    bool SortResolutions( const std::pair<int, int> & first, const std::pair<int, int> & second )
+    bool SortResolutions( const fheroes2::Size & first, const fheroes2::Size & second )
     {
-        return first.first > second.first || ( first.first == second.first && first.second >= second.second );
+        return first.width > second.width || ( first.width == second.width && first.height >= second.height );
     }
 
-    bool IsLowerThanDefaultRes( const std::pair<int, int> & value )
+    bool IsLowerThanDefaultRes( const fheroes2::Size & value )
     {
-        return value.first < fheroes2::Display::DEFAULT_WIDTH || value.second < fheroes2::Display::DEFAULT_HEIGHT;
+        return value.width < fheroes2::Display::DEFAULT_WIDTH || value.height < fheroes2::Display::DEFAULT_HEIGHT;
     }
 
-    std::vector<std::pair<int, int> > FilterResolutions( const std::set<std::pair<int, int> > & resolutionSet )
+    std::vector<fheroes2::Size> FilterResolutions( const std::set<fheroes2::Size> & resolutionSet )
     {
-        if ( resolutionSet.empty() )
-            return std::vector<std::pair<int, int> >();
+        if ( resolutionSet.empty() ) {
+            const std::vector<fheroes2::Size> resolutions = {fheroes2::Size( fheroes2::Display::DEFAULT_WIDTH, fheroes2::Display::DEFAULT_HEIGHT )};
+            return resolutions;
+        }
 
-        std::vector<std::pair<int, int> > resolutions( resolutionSet.begin(), resolutionSet.end() );
+        std::vector<fheroes2::Size> resolutions( resolutionSet.begin(), resolutionSet.end() );
         std::sort( resolutions.begin(), resolutions.end(), SortResolutions );
 
-        if ( resolutions.front().first >= fheroes2::Display::DEFAULT_WIDTH && resolutions.front().first >= fheroes2::Display::DEFAULT_HEIGHT ) {
+        // Remove all resolutions lower than the original.
+        if ( resolutions.front().width >= fheroes2::Display::DEFAULT_WIDTH && resolutions.front().height >= fheroes2::Display::DEFAULT_HEIGHT ) {
             resolutions.erase( std::remove_if( resolutions.begin(), resolutions.end(), IsLowerThanDefaultRes ), resolutions.end() );
+        }
+
+        // If here is only one resolution and it is bigger than the original we failed to find any resolutions except the current.
+        // In this case populate the list with missing resolutions.
+        if ( resolutions.size() == 1 && resolutions.front().width > fheroes2::Display::DEFAULT_WIDTH && resolutions.front().height > fheroes2::Display::DEFAULT_HEIGHT ) {
+            assert( fheroes2::Display::DEFAULT_WIDTH == 640 && fheroes2::Display::DEFAULT_HEIGHT == 480 );
+            const std::vector<fheroes2::Size> possibleResolutions
+                = {fheroes2::Size( 640, 480 ), fheroes2::Size( 800, 600 ), fheroes2::Size( 1024, 768 ), fheroes2::Size( 1280, 960 ), fheroes2::Size( 1920, 1080 )};
+            const fheroes2::Size & currentResolution = resolutions.front();
+            for ( size_t i = 0; i < possibleResolutions.size(); ++i ) {
+                if ( currentResolution.width <= possibleResolutions[i].width || currentResolution.height <= possibleResolutions[i].height ) {
+                    break;
+                }
+                resolutions.emplace_back( possibleResolutions[i] );
+            }
+
+            std::sort( resolutions.begin(), resolutions.end(), SortResolutions );
         }
 
         return resolutions;
@@ -265,6 +286,7 @@ namespace
             }
 
             SDL_SetWindowFullscreen( _window, flags );
+            _retrieveWindowInfo();
         }
 
         virtual bool isFullScreen() const override
@@ -276,12 +298,12 @@ namespace
             return ( flags & SDL_WINDOW_FULLSCREEN ) != 0 || ( flags & SDL_WINDOW_FULLSCREEN_DESKTOP ) != 0;
         }
 
-        virtual std::vector<std::pair<int, int> > getAvailableResolutions() const override
+        virtual std::vector<fheroes2::Size> getAvailableResolutions() const override
         {
-            static std::vector<std::pair<int, int> > filteredResolutions;
+            static std::vector<fheroes2::Size> filteredResolutions;
 
             if ( filteredResolutions.empty() ) {
-                std::set<std::pair<int, int> > resolutionSet;
+                std::set<fheroes2::Size> resolutionSet;
 
                 const int displayCount = SDL_GetNumVideoDisplays();
                 if ( displayCount > 0 ) {
@@ -289,12 +311,12 @@ namespace
                     for ( int i = 0; i < displayModeCount; ++i ) {
                         SDL_DisplayMode videoMode;
                         if ( SDL_GetDisplayMode( 0, i, &videoMode ) == 0 ) {
-                            resolutionSet.insert( std::make_pair( videoMode.w, videoMode.h ) );
+                            resolutionSet.emplace( videoMode.w, videoMode.h );
                         }
                     }
                 }
 
-                resolutionSet.insert( std::make_pair( 848, 480 ) );
+                resolutionSet.insert( fheroes2::Size( 848, 480 ) );
 				filteredResolutions = FilterResolutions( resolutionSet );
             }
 
@@ -347,6 +369,16 @@ namespace
             SDL_SetWindowIcon( _window, surface );
 
             SDL_FreeSurface( surface );
+        }
+
+        virtual fheroes2::Rect getActiveWindowROI() const override
+        {
+            return _activeWindowROI;
+        }
+
+        virtual fheroes2::Size getCurrentScreenResolution() const override
+        {
+            return _currentScreenResolution;
         }
 
         static RenderEngine * create()
@@ -414,7 +446,16 @@ namespace
             }
             else if ( _surface->format->BitsPerPixel == 8 ) {
                 if ( _surface->pixels != display.image() ) {
-                    memcpy( _surface->pixels, display.image(), static_cast<size_t>( width * height ) );
+                    if ( display.width() % 4 != 0 ) {
+                        const int32_t screenWidth = ( display.width() / 4 ) * 4 + 4;
+                        for ( int32_t i = 0; i < display.height(); ++i ) {
+                            memcpy( reinterpret_cast<int8_t *>( _surface->pixels ) + screenWidth * i, display.image() + display.width() * i,
+                                    static_cast<size_t>( width ) );
+                        }
+                    }
+                    else {
+                        memcpy( _surface->pixels, display.image(), static_cast<size_t>( width * height ) );
+                    }
                 }
             }
 
@@ -441,11 +482,11 @@ namespace
         {
             clear();
 
-            const std::vector<std::pair<int, int> > resolutions = getAvailableResolutions();
+            const std::vector<fheroes2::Size> resolutions = getAvailableResolutions();
             if ( !resolutions.empty() ) {
-                const std::pair<int, int> correctResolution = GetNearestResolution( width_, height_, resolutions );
-                width_ = correctResolution.first;
-                height_ = correctResolution.second;
+                const fheroes2::Size correctResolution = GetNearestResolution( width_, height_, resolutions );
+                width_ = correctResolution.width;
+                height_ = correctResolution.height;
             }
 
             uint32_t flags = SDL_WINDOW_SHOWN;
@@ -506,6 +547,7 @@ namespace
                 return false;
             }
 
+            _retrieveWindowInfo();
             return true;
         }
 
@@ -543,6 +585,10 @@ namespace
 
                 SDL_SetPaletteColors( _surface->format->palette, _palette8Bit.data(), 0, 256 );
             }
+            else {
+                // This is unsupported format. Please implement it.
+                assert( 0 );
+            }
         }
 
         virtual bool isMouseCursorActive() const override
@@ -561,6 +607,8 @@ namespace
 
         std::string _previousWindowTitle;
         fheroes2::Point _prevWindowPos;
+        fheroes2::Size _currentScreenResolution;
+        fheroes2::Rect _activeWindowROI;
 
         int renderFlags() const
         {
@@ -582,9 +630,24 @@ namespace
                         memcpy( _surface->pixels, display.image(), static_cast<size_t>( display.width() * display.height() ) );
                     }
 
-                    linkRenderSurface( static_cast<uint8_t *>( _surface->pixels ) );
+                    // Display class doesn't have support for image pitch so we mustn't link display to surface if width is not divisible by 4.
+                    if ( _surface->w % 4 == 0 ) {
+                        linkRenderSurface( static_cast<uint8_t *>( _surface->pixels ) );
+                    }
                 }
             }
+        }
+
+        void _retrieveWindowInfo()
+        {
+            const int32_t displayIndex = SDL_GetWindowDisplayIndex( _window );
+            SDL_DisplayMode displayMode;
+            SDL_GetCurrentDisplayMode( displayIndex, &displayMode );
+            _currentScreenResolution.width = displayMode.w;
+            _currentScreenResolution.height = displayMode.h;
+
+            SDL_GetWindowPosition( _window, &_activeWindowROI.x, &_activeWindowROI.y );
+            SDL_GetWindowSize( _window, &_activeWindowROI.width, &_activeWindowROI.height );
         }
     };
 #else
@@ -630,16 +693,16 @@ namespace
             return ( ( _surface->flags & SDL_FULLSCREEN ) != 0 );
         }
 
-        virtual std::vector<std::pair<int, int> > getAvailableResolutions() const override
+        virtual std::vector<fheroes2::Size> getAvailableResolutions() const override
         {
-            static std::vector<std::pair<int, int> > filteredResolutions;
+            static std::vector<fheroes2::Size> filteredResolutions;
 
             if ( filteredResolutions.empty() ) {
-                std::set<std::pair<int, int> > resolutionSet;
+                std::set<fheroes2::Size> resolutionSet;
                 SDL_Rect ** modes = SDL_ListModes( NULL, SDL_FULLSCREEN | SDL_HWSURFACE );
                 if ( modes != NULL && modes != reinterpret_cast<SDL_Rect **>( -1 ) ) {
                     for ( int i = 0; modes[i]; ++i ) {
-                        resolutionSet.insert( std::make_pair( modes[i]->w, modes[i]->h ) );
+                        resolutionSet.emplace( modes[i]->w, modes[i]->h );
                     }
                 }
 
@@ -726,7 +789,16 @@ namespace
             }
             else if ( _surface->format->BitsPerPixel == 8 ) {
                 if ( _surface->pixels != display.image() ) {
-                    memcpy( _surface->pixels, display.image(), static_cast<size_t>( width * height ) );
+                    if ( display.width() % 4 != 0 ) {
+                        const int32_t screenWidth = ( display.width() / 4 ) * 4 + 4;
+                        for ( int32_t i = 0; i < display.height(); ++i ) {
+                            memcpy( reinterpret_cast<int8_t *>( _surface->pixels ) + screenWidth * i, display.image() + display.width() * i,
+                                    static_cast<size_t>( width ) );
+                        }
+                    }
+                    else {
+                        memcpy( _surface->pixels, display.image(), static_cast<size_t>( width * height ) );
+                    }
                 }
             }
 
@@ -753,11 +825,11 @@ namespace
         {
             clear();
 
-            const std::vector<std::pair<int, int> > resolutions = getAvailableResolutions();
+            const std::vector<fheroes2::Size> resolutions = getAvailableResolutions();
             if ( !resolutions.empty() ) {
-                const std::pair<int, int> correctResolution = GetNearestResolution( width_, height_, resolutions );
-                width_ = correctResolution.first;
-                height_ = correctResolution.second;
+                const fheroes2::Size correctResolution = GetNearestResolution( width_, height_, resolutions );
+                width_ = correctResolution.width;
+                height_ = correctResolution.height;
             }
 
             uint32_t flags = renderFlags();
@@ -813,6 +885,10 @@ namespace
 
                 SDL_SetPalette( _surface, SDL_LOGPAL | SDL_PHYSPAL, _palette8Bit.data(), 0, 256 );
             }
+            else {
+                // This is unsupported format. Please implement it.
+                assert( 0 );
+            }
         }
 
         virtual bool isMouseCursorActive() const override
@@ -844,13 +920,16 @@ namespace
 
             if ( _surface->format->BitsPerPixel == 8 ) {
                 if ( !SDL_MUSTLOCK( _surface ) ) {
-                    // copy the image from display buffer to SDL surface
+                    // Copy the image from display buffer to SDL surface in case of fullscreen toggling
                     fheroes2::Display & display = fheroes2::Display::instance();
                     if ( _surface->w == display.width() && _surface->h == display.height() ) {
                         memcpy( _surface->pixels, display.image(), static_cast<size_t>( display.width() * display.height() ) );
                     }
 
-                    linkRenderSurface( static_cast<uint8_t *>( _surface->pixels ) );
+                    // Display class doesn't have support for image pitch so we mustn't link display to surface if width is not divisible by 4.
+                    if ( _surface->w % 4 == 0 ) {
+                        linkRenderSurface( static_cast<uint8_t *>( _surface->pixels ) );
+                    }
                 }
             }
         }
@@ -872,7 +951,7 @@ namespace fheroes2
         , _postprocessing( NULL )
         , _renderSurface( NULL )
     {
-        disableTransformLayer();
+        _disableTransformLayer();
     }
 
     Display::~Display()
@@ -919,14 +998,19 @@ namespace fheroes2
 
             _renderFrame();
 
-            Blit( backup, *this, backup.x(), backup.y() );
+            if ( _postprocessing != nullptr ) {
+                _postprocessing();
+            }
+
+            Copy( backup, 0, 0, *this, backup.x(), backup.y(), backup.width(), backup.height() );
         }
         else {
             _renderFrame();
-        }
 
-        if ( _postprocessing != NULL )
-            _postprocessing();
+            if ( _postprocessing != nullptr ) {
+                _postprocessing();
+            }
+        }
     }
 
     void Display::_renderFrame()

@@ -22,23 +22,20 @@
 
 #include <math.h>
 
-#include "agg.h"
-#include "bin_info.h"
 #include "castle.h"
 #include "difficulty.h"
-#include "error.h"
-#include "game.h"
 #include "game_static.h"
 #include "icn.h"
+#include "logging.h"
 #include "luck.h"
 #include "m82.h"
 #include "monster.h"
 #include "morale.h"
 #include "mp2.h"
 #include "race.h"
-#include "settings.h"
+#include "rand.h"
 #include "speed.h"
-#include "spell.h"
+#include "translations.h"
 
 struct monstats_t
 {
@@ -346,11 +343,6 @@ StreamBase & operator>>( StreamBase & msg, const MonsterStaticData & /*obj*/ )
     return msg;
 }
 
-float Monster::GetUpgradeRatio( void )
-{
-    return GameStatic::GetMonsterUpgradeRatio();
-}
-
 uint32_t Monster::GetICNByMonsterID( uint32_t monsterID )
 {
     if ( monsterID <= Monster::WATER_ELEMENT )
@@ -458,7 +450,7 @@ void Monster::UpdateStats( const std::string & spec )
         }
     }
     else
-        VERBOSE( spec << ": " << doc.ErrorDesc() );
+        VERBOSE_LOG( spec << ": " << doc.ErrorDesc() );
 #else
     (void)spec;
 #endif
@@ -630,7 +622,7 @@ double Monster::GetMonsterStrength( int attack, int defense ) const
         attack = GetAttack();
 
     if ( defense == -1 )
-        attack = GetDefense();
+        defense = GetDefense();
 
     const double attackDefense = 1.0 + attack * 0.1 + defense * 0.05;
     const double effectiveHP = GetHitPoints() * ( ignoreRetaliation() ? 1.4 : 1 );
@@ -1983,13 +1975,17 @@ payment_t Monster::GetUpgradeCost( void ) const
     Monster upgr = GetUpgrade();
     payment_t pay = id != upgr.id ? upgr.GetCost() - GetCost() : GetCost();
 
-    pay.wood = static_cast<s32>( pay.wood * GetUpgradeRatio() );
-    pay.mercury = static_cast<s32>( pay.mercury * GetUpgradeRatio() );
-    pay.ore = static_cast<s32>( pay.ore * GetUpgradeRatio() );
-    pay.sulfur = static_cast<s32>( pay.sulfur * GetUpgradeRatio() );
-    pay.crystal = static_cast<s32>( pay.crystal * GetUpgradeRatio() );
-    pay.gems = static_cast<s32>( pay.gems * GetUpgradeRatio() );
-    pay.gold = static_cast<s32>( pay.gold * GetUpgradeRatio() );
+    if ( GameStatic::isCustomMonsterUpgradeOption() ) {
+        const float upgradeRatio = GameStatic::GetMonsterUpgradeRatio();
+
+        pay.wood = static_cast<int32_t>( pay.wood * upgradeRatio );
+        pay.mercury = static_cast<int32_t>( pay.mercury * upgradeRatio );
+        pay.ore = static_cast<int32_t>( pay.ore * upgradeRatio );
+        pay.sulfur = static_cast<int32_t>( pay.sulfur * upgradeRatio );
+        pay.crystal = static_cast<int32_t>( pay.crystal * upgradeRatio );
+        pay.gems = static_cast<int32_t>( pay.gems * upgradeRatio );
+        pay.gold = static_cast<int32_t>( pay.gold * upgradeRatio );
+    }
 
     return pay;
 }

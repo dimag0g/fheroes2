@@ -24,6 +24,7 @@
 #include <vector>
 
 #include "agg.h"
+#include "audio_mixer.h"
 #include "castle.h"
 #include "cursor.h"
 #include "dialog.h"
@@ -33,8 +34,10 @@
 #include "game_over.h"
 #include "heroes.h"
 #include "kingdom.h"
+#include "logging.h"
 #include "m82.h"
-#include "settings.h"
+#include "system.h"
+#include "text.h"
 #include "world.h"
 
 void Interface::Basic::CalculateHeroPath( Heroes * hero, s32 destinationIdx )
@@ -50,7 +53,7 @@ void Interface::Basic::CalculateHeroPath( Heroes * hero, s32 destinationIdx )
         destinationIdx = path.GetDestinedIndex(); // returns -1 at the time of launching new game (because of no path history)
     if ( destinationIdx != -1 ) {
         hero->GetPath().setPath( world.getPath( *hero, destinationIdx ), destinationIdx );
-        DEBUG( DBG_GAME, DBG_TRACE, hero->GetName() << ", distance: " << world.getDistance( *hero, destinationIdx ) << ", route: " << path.String() );
+        DEBUG_LOG( DBG_GAME, DBG_TRACE, hero->GetName() << ", distance: " << world.getDistance( *hero, destinationIdx ) << ", route: " << path.String() );
         gameArea.SetRedraw();
 
         LocalEvent & le = LocalEvent::Get();
@@ -111,7 +114,7 @@ void Interface::Basic::MoveHeroFromArrowKeys( Heroes & hero, int direct )
             break;
 
         default:
-            allow = ( tile.isPassable( Direction::CENTER, fromWater, false ) || MP2::isActionObject( tile.GetObject(), fromWater ) );
+            allow = ( tile.isPassable( Direction::CENTER, fromWater, false, hero.GetColor() ) || MP2::isActionObject( tile.GetObject(), fromWater ) );
             break;
         }
 
@@ -178,7 +181,7 @@ void Interface::Basic::EventCastSpell( void )
         ResetFocus( GameFocus::HEROES );
         Redraw();
 
-        const Spell spell = hero->OpenSpellBook( SpellBook::ADVN, true );
+        const Spell spell = hero->OpenSpellBook( SpellBook::Filter::ADVN, true, nullptr );
         // apply cast spell
         if ( spell.isValid() ) {
             hero->ActionSpellCast( spell );
@@ -206,6 +209,7 @@ int Interface::Basic::EventAdventureDialog( void )
     Mixer::Reduce();
     switch ( Dialog::AdventureOptions( GameFocus::HEROES == GetFocusType() ) ) {
     case Dialog::WORLD:
+        ViewWorld::ViewWorldWindow( Settings::Get().CurrentColor(), ViewWorldMode::OnlyVisible, *this );
         break;
 
     case Dialog::PUZZLE:
@@ -294,10 +298,27 @@ int Interface::Basic::EventNewGame( void )
 
 int Interface::Basic::EventSaveGame( void )
 {
-    std::string filename = Dialog::SelectFileSave();
-    if ( filename.size() && Game::Save( filename ) )
-        Dialog::Message( "", _( "Game saved successfully." ), Font::BIG, Dialog::OK );
-    return Game::CANCEL;
+    while ( true ) {
+        const std::string filename = Dialog::SelectFileSave();
+        if ( filename.empty() ) {
+            return Game::CANCEL;
+        }
+
+        // ask overwrite?
+        const Settings & conf = Settings::Get();
+        if ( System::IsFile( filename ) && conf.ExtGameRewriteConfirm()
+             && Dialog::NO == Dialog::Message( "", _( "Are you sure you want to overwrite the save with this name?" ), Font::BIG, Dialog::YES | Dialog::NO ) ) {
+            continue;
+        }
+
+        if ( Game::Save( filename ) ) {
+            Dialog::Message( "", _( "Game saved successfully." ), Font::BIG, Dialog::OK );
+        }
+        else {
+            Dialog::Message( "", _( "There was an issue during saving." ), Font::BIG, Dialog::OK );
+        }
+        return Game::CANCEL;
+    }
 }
 
 int Interface::Basic::EventLoadGame( void )
@@ -395,7 +416,7 @@ void Interface::Basic::EventDefaultAction( void )
 
         // 1. action object
         if ( MP2::isActionObject( hero->GetMapsObject(), hero->isShipMaster() ) && ( !MP2::isMoveObject( hero->GetMapsObject() ) || hero->CanMove() ) ) {
-            hero->Action( hero->GetIndex() );
+            hero->Action( hero->GetIndex(), true );
             if ( MP2::OBJ_STONELITHS == tile.GetObject( false ) || MP2::OBJ_WHIRLPOOL == tile.GetObject( false ) )
                 SetRedraw( REDRAW_HEROES );
             SetRedraw( REDRAW_GAMEAREA );
@@ -406,7 +427,7 @@ void Interface::Basic::EventDefaultAction( void )
             hero->SetMove( true );
         else
             // 3. hero dialog
-            Game::OpenHeroesDialog( *hero );
+            Game::OpenHeroesDialog( *hero, true, true );
     }
     else
         // 4. town dialog
@@ -418,7 +439,7 @@ void Interface::Basic::EventDefaultAction( void )
 void Interface::Basic::EventOpenFocus( void )
 {
     if ( GetFocusHeroes() )
-        Game::OpenHeroesDialog( *GetFocusHeroes() );
+        Game::OpenHeroesDialog( *GetFocusHeroes(), true, true );
     else if ( GetFocusCastle() )
         Game::OpenCastleDialog( *GetFocusCastle() );
 }

@@ -23,6 +23,10 @@
 #include <cmath>
 #include <stdint.h>
 
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
 // Below source code was partially taken from https://github.com/ihhub/penguinv open source project
 namespace fheroes2
 {
@@ -106,6 +110,11 @@ namespace fheroes2
         bool operator!=( const SizeBase2D & size ) const
         {
             return !( *this == size );
+        }
+
+        bool operator<( const SizeBase2D & size ) const
+        {
+            return width < size.width || ( width == size.width && height < size.height );
         }
 
         SizeBase2D & operator+=( const SizeBase2D & size )
@@ -241,7 +250,7 @@ namespace fheroes2
         _TypeSize height;
     };
 
-    typedef PointBase2D<int32_t> Point;
-    typedef SizeBase2D<int32_t> Size;
-    typedef RectBase2D<int32_t, int32_t> Rect;
+    using Point = PointBase2D<int32_t>;
+    using Size = SizeBase2D<int32_t>;
+    using Rect = RectBase2D<int32_t, int32_t>;
 }

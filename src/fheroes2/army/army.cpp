@@ -33,13 +33,14 @@
 #include "heroes.h"
 #include "heroes_base.h"
 #include "kingdom.h"
+#include "logging.h"
 #include "luck.h"
 #include "maps_tiles.h"
 #include "morale.h"
 #include "payment.h"
 #include "race.h"
+#include "rand.h"
 #include "screen.h"
-#include "settings.h"
 #include "speed.h"
 #include "text.h"
 #include "tools.h"
@@ -320,7 +321,7 @@ bool Troops::JoinTroop( const Monster & mons, u32 count )
             else
                 ( *it )->Set( mons, count );
 
-            DEBUG( DBG_GAME, DBG_INFO, std::dec << count << " " << ( *it )->GetName() );
+            DEBUG_LOG( DBG_GAME, DBG_INFO, std::dec << count << " " << ( *it )->GetName() );
             return true;
         }
     }
@@ -500,12 +501,10 @@ Troop * Troops::GetWeakestTroop( void )
     return *lowest;
 }
 
-Troop * Troops::GetSlowestTroop( void )
+const Troop * Troops::GetSlowestTroop() const
 {
-    iterator first, last, lowest;
-
-    first = begin();
-    last = end();
+    const_iterator first = begin();
+    const_iterator last = end();
 
     while ( first != last )
         if ( ( *first )->isValid() )
@@ -514,8 +513,8 @@ Troop * Troops::GetSlowestTroop( void )
             ++first;
 
     if ( first == end() )
-        return NULL;
-    lowest = first;
+        return nullptr;
+    const_iterator lowest = first;
 
     if ( first != last )
         while ( ++first != last )
@@ -567,12 +566,12 @@ void Troops::SortStrongest()
     std::sort( begin(), end(), Army::StrongestTroop );
 }
 
+// Pre-battle arrangement for Monster or Neutral troops
 void Troops::ArrangeForBattle( bool upgrade )
 {
     const Troops & priority = GetOptimized();
 
-    switch ( priority.size() ) {
-    case 1: {
+    if ( priority.size() == 1 ) {
         const Monster & m = *priority.back();
         const u32 count = priority.back()->GetCount();
 
@@ -600,31 +599,9 @@ void Troops::ArrangeForBattle( bool upgrade )
         }
         else
             at( 2 )->Set( m, count );
-        break;
     }
-    case 2: {
-        // TODO: need modify army for 2 troops
+    else {
         Assign( priority );
-        break;
-    }
-    case 3: {
-        // TODO: need modify army for 3 troops
-        Assign( priority );
-        break;
-    }
-    case 4: {
-        // TODO: need modify army for 4 troops
-        Assign( priority );
-        break;
-    }
-    case 5: {
-        // possible change orders monster
-        // store
-        Assign( priority );
-        break;
-    }
-    default:
-        break;
     }
 }
 
@@ -822,6 +799,25 @@ void Troops::AssignToFirstFreeSlot( const Troop & troop, const uint32_t splitCou
 
         ( *it )->Set( troop.GetMonster(), splitCount );
         break;
+    }
+}
+
+void Troops::JoinAllTroopsOfType( const Troop & targetTroop )
+{
+    const int troopID = targetTroop.GetID();
+    const int totalMonsterCount = GetCountMonsters( troopID );
+
+    for ( iterator it = begin(); it != end(); ++it ) {
+        Troop * troop = *it;
+        if ( !troop->isValid() || troop->GetID() != troopID )
+            continue;
+
+        if ( troop == &targetTroop ) {
+            troop->SetCount( totalMonsterCount );
+        }
+        else {
+            troop->Reset();
+        }
     }
 }
 
@@ -1038,7 +1034,7 @@ int Army::GetRace( void ) const
     races.resize( std::distance( races.begin(), std::unique( races.begin(), races.end() ) ) );
 
     if ( races.empty() ) {
-        DEBUG( DBG_GAME, DBG_WARN, "empty" );
+        DEBUG_LOG( DBG_GAME, DBG_WARN, "empty" );
         return Race::NONE;
     }
 
@@ -1399,7 +1395,7 @@ bool Army::isStrongerThan( const Army & target, double safetyRatio ) const
     const double str1 = GetStrength();
     const double str2 = target.GetStrength() * safetyRatio;
 
-    DEBUG( DBG_GAME, DBG_TRACE, "Comparing troops: " << str1 << " versus " << str2 );
+    DEBUG_LOG( DBG_GAME, DBG_TRACE, "Comparing troops: " << str1 << " versus " << str2 );
 
     return str1 > str2;
 }
@@ -1407,11 +1403,6 @@ bool Army::isStrongerThan( const Army & target, double safetyRatio ) const
 bool Army::ArmyStrongerThanEnemy( const Army & army1, const Army & army2 )
 {
     return army1.isStrongerThan( army2 );
-}
-
-void Army::DrawMons32LineWithScoute( const Troops & troops, s32 cx, s32 cy, u32 width, u32 first, u32 count, u32 scoute )
-{
-    troops.DrawMons32Line( cx, cy, width, first, count, scoute, false, true );
 }
 
 /* draw MONS32 sprite in line, first valid = 0, count = 0 */

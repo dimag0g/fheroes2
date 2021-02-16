@@ -25,6 +25,7 @@
 #include "game_interface.h"
 #include "ground.h"
 #include "kingdom.h"
+#include "logging.h"
 #include "mus.h"
 #include "world.h"
 
@@ -47,8 +48,8 @@ namespace AI
         KingdomHeroes & heroes = kingdom.GetHeroes();
         KingdomCastles & castles = kingdom.GetCastles();
 
-        DEBUG( DBG_AI, DBG_INFO, Color::String( color ) << " starts the turn: " << castles.size() << " castles, " << heroes.size() << " heroes" );
-        DEBUG( DBG_AI, DBG_TRACE, "Funds: " << kingdom.GetFunds().String() );
+        DEBUG_LOG( DBG_AI, DBG_INFO, Color::String( color ) << " starts the turn: " << castles.size() << " castles, " << heroes.size() << " heroes" );
+        DEBUG_LOG( DBG_AI, DBG_TRACE, "Funds: " << kingdom.GetFunds().String() );
 
         // Step 1. Scan visible map (based on game difficulty), add goals and threats
         std::vector<std::pair<int, const Army *> > enemyArmies;
@@ -73,7 +74,8 @@ namespace AI
             }
 
             RegionStats & stats = _regions[regionID];
-            stats.validObjects.emplace_back( idx, objectID );
+            if ( objectID != MP2::OBJ_COAST )
+                stats.validObjects.emplace_back( idx, objectID );
 
             if ( !tile.isFog( color ) ) {
                 _mapObjects.emplace_back( idx, objectID );
@@ -120,7 +122,7 @@ namespace AI
             }
         }
 
-        DEBUG( DBG_AI, DBG_TRACE, Color::String( color ) << " found " << _mapObjects.size() << " valid objects" );
+        DEBUG_LOG( DBG_AI, DBG_TRACE, Color::String( color ) << " found " << _mapObjects.size() << " valid objects" );
 
         status.RedrawTurnProgress( 1 );
 
@@ -134,7 +136,7 @@ namespace AI
         }
 
         const uint32_t threatDistanceLimit = 2500; // 25 tiles, roughly how much maxed out hero can move in a turn
-        std::vector<int> castlesInDanger;
+        std::set<int> castlesInDanger;
 
         for ( auto enemy = enemyArmies.begin(); enemy != enemyArmies.end(); ++enemy ) {
             if ( enemy->second == nullptr )
@@ -157,8 +159,7 @@ namespace AI
                         const uint32_t dist = _pathfinder.getDistance( enemy->first, castleIndex, color, attackerStrength );
                         if ( dist && dist < threatDistanceLimit ) {
                             // castle is under threat
-                            castlesInDanger.push_back( castleIndex );
-                            break;
+                            castlesInDanger.insert( castleIndex );
                         }
                     }
                 }
@@ -171,7 +172,12 @@ namespace AI
         if ( slowEarlyGame )
             heroLimit = 2;
 
-        // Step 3. Buy new heroes, adjust roles, sort heroes based on priority or strength
+        // Step 3. Do some hero stuff.
+        HeroesTurn( heroes );
+
+        status.RedrawTurnProgress( 6 );
+
+        // Step 4. Buy new heroes, adjust roles, sort heroes based on priority or strength
 
         // sort castles by value: best first
         VecCastles sortedCastleList( castles );
@@ -225,37 +231,10 @@ namespace AI
             }
         }
 
-        // Copy hero list and sort (original list may be altered during the turn)
-        VecHeroes sortedHeroList = heroes;
-        std::sort( sortedHeroList.begin(), sortedHeroList.end(), []( const Heroes * left, const Heroes * right ) {
-            if ( left && right )
-                return left->GetArmy().GetStrength() > right->GetArmy().GetStrength();
-            return right == NULL;
-        } );
+        status.RedrawTurnProgress( 7 );
 
-        status.RedrawTurnProgress( 2 );
-
-        // Step 4. Move heroes until they have nothing to do (HERO_WAITING or HERO_MOVED state)
-        size_t heroesMovedCount = 0;
-        for ( auto it = sortedHeroList.begin(); it != sortedHeroList.end(); ++it ) {
-            if ( *it ) {
-                HeroTurn( **it );
-
-                if ( ( *it )->Modes( HERO_MOVED ) ) {
-                    ++heroesMovedCount;
-                    status.RedrawTurnProgress( 2 + ( 7 * heroesMovedCount / sortedHeroList.size() ) );
-                }
-            }
-        }
-
-        // Step 5. Repeat process (maybe there was a path unlocked by a stronger hero)
-        for ( auto it = sortedHeroList.begin(); it != sortedHeroList.end(); ++it ) {
-            if ( *it && !( *it )->Modes( HERO_MOVED ) ) {
-                HeroTurn( **it );
-                ++heroesMovedCount;
-                status.RedrawTurnProgress( 2 + ( 7 * heroesMovedCount / sortedHeroList.size() ) );
-            }
-        }
+        // Step 5. Move newly hired heroes if any.
+        HeroesTurn( heroes );
 
         status.RedrawTurnProgress( 9 );
 

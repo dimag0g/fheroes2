@@ -25,6 +25,7 @@
 #include <sstream>
 
 #include "army.h"
+#include "campaign_savedata.h"
 #include "castle.h"
 #include "dialog.h"
 #include "game.h"
@@ -34,15 +35,19 @@
 #include "heroes.h"
 #include "interface_gamearea.h"
 #include "kingdom.h"
+#include "logging.h"
 #include "monster.h"
-#include "settings.h"
+#include "system.h"
 #include "text.h"
 #include "tools.h"
 #include "world.h"
 #include "zzlib.h"
 
-static u16 SAV2ID2 = 0xFF02;
-static u16 SAV2ID3 = 0xFF03;
+namespace
+{
+    const uint16_t SAV2ID2 = 0xFF02;
+    const uint16_t SAV2ID3 = 0xFF03;
+}
 
 namespace Game
 {
@@ -97,9 +102,9 @@ namespace Game
             , gameType( 0 )
         {}
 
-        HeaderSAV( const Maps::FileInfo & fi, const bool loyalty, const int gameType )
+        HeaderSAV( const Maps::FileInfo & fi, const bool loyalty, const int gameType_ )
             : HeaderSAVBase( fi, loyalty )
-            , gameType( gameType )
+            , gameType( gameType_ )
         {}
 
         int gameType;
@@ -123,21 +128,15 @@ bool Game::AutoSave()
 
 bool Game::Save( const std::string & fn )
 {
-    DEBUG( DBG_GAME, DBG_INFO, fn );
+    DEBUG_LOG( DBG_GAME, DBG_INFO, fn );
     const bool autosave = ( System::GetBasename( fn ) == "AUTOSAVE" + GetSaveFileExtension() );
     const Settings & conf = Settings::Get();
-
-    // ask overwrite?
-    if ( System::IsFile( fn ) && !autosave && conf.ExtGameRewriteConfirm()
-         && Dialog::NO == Dialog::Message( "", _( "Are you sure you want to overwrite the save with this name?" ), Font::BIG, Dialog::YES | Dialog::NO ) ) {
-        return false;
-    }
 
     StreamFile fs;
     fs.setbigendian( true );
 
     if ( !fs.open( fn, "wb" ) ) {
-        DEBUG( DBG_GAME, DBG_INFO, fn << ", error open" );
+        DEBUG_LOG( DBG_GAME, DBG_INFO, fn << ", error open" );
         return false;
     }
 
@@ -146,7 +145,7 @@ bool Game::Save( const std::string & fn )
         Game::SetLastSavename( fn );
 
     // raw info content
-    fs << static_cast<char>( SAV2ID3 >> 8 ) << static_cast<char>( SAV2ID3 ) << GetString( loadver ) << loadver
+    fs << static_cast<char>( SAV2ID3 >> 8 ) << static_cast<char>( SAV2ID3 ) << std::to_string( loadver ) << loadver
        << HeaderSAV( conf.CurrentFileInfo(), conf.PriceLoyaltyVersion(), conf.GameType() );
     fs.close();
 
@@ -154,14 +153,19 @@ bool Game::Save( const std::string & fn )
     fz.setbigendian( true );
 
     // zip game data content
-    fz << loadver << World::Get() << Settings::Get() << GameOver::Result::Get() << GameStatic::Data::Get() << MonsterStaticData::Get() << SAV2ID3; // eof marker
+    fz << loadver << World::Get() << Settings::Get() << GameOver::Result::Get() << GameStatic::Data::Get() << MonsterStaticData::Get();
+
+    if ( conf.GameType() & Game::TYPE_CAMPAIGN )
+        fz << Campaign::CampaignSaveData::Get();
+
+    fz << SAV2ID3; // eof marker
 
     return !fz.fail() && fz.write( fn, true );
 }
 
 bool Game::Load( const std::string & fn )
 {
-    DEBUG( DBG_GAME, DBG_INFO, fn );
+    DEBUG_LOG( DBG_GAME, DBG_INFO, fn );
     Settings & conf = Settings::Get();
     // loading info
     Game::ShowMapLoadingText();
@@ -170,7 +174,7 @@ bool Game::Load( const std::string & fn )
     fs.setbigendian( true );
 
     if ( !fs.open( fn, "rb" ) ) {
-        DEBUG( DBG_GAME, DBG_INFO, fn << ", error open" );
+        DEBUG_LOG( DBG_GAME, DBG_INFO, fn << ", error open" );
         return false;
     }
 
@@ -180,7 +184,7 @@ bool Game::Load( const std::string & fn )
 
     // check version sav file
     if ( savid != SAV2ID2 && savid != SAV2ID3 ) {
-        DEBUG( DBG_GAME, DBG_INFO, fn << ", incorrect SAV2ID" );
+        DEBUG_LOG( DBG_GAME, DBG_INFO, fn << ", incorrect SAV2ID" );
         return false;
     }
 
@@ -196,8 +200,8 @@ bool Game::Load( const std::string & fn )
 
     int fileGameType = Game::TYPE_STANDARD;
     HeaderSAVBase header;
-    // starting from 0.9.0, headers also include gameType
-    if ( binver >= FORMAT_VERSION_090_RELEASE ) {
+    // starting from 0.8.4, headers also include gameType
+    if ( binver >= FORMAT_VERSION_084_RELEASE ) {
         HeaderSAV currentFormatHeader;
         fs >> currentFormatHeader;
 
@@ -218,7 +222,7 @@ bool Game::Load( const std::string & fn )
 
 #ifndef WITH_ZLIB
     if ( header.status & HeaderSAV::IS_COMPRESS ) {
-        DEBUG( DBG_GAME, DBG_INFO, fn << ", zlib: unsupported" );
+        DEBUG_LOG( DBG_GAME, DBG_INFO, fn << ", zlib: unsupported" );
         return false;
     }
 #endif
@@ -227,7 +231,7 @@ bool Game::Load( const std::string & fn )
     fz.setbigendian( true );
 
     if ( !fz.read( fn, offset ) ) {
-        DEBUG( DBG_GAME, DBG_INFO, ", uncompress: error" );
+        DEBUG_LOG( DBG_GAME, DBG_INFO, ", uncompress: error" );
         return false;
     }
 
@@ -247,14 +251,31 @@ bool Game::Load( const std::string & fn )
         return false;
     }
 
-    DEBUG( DBG_GAME, DBG_TRACE, "load version: " << binver );
+    DEBUG_LOG( DBG_GAME, DBG_TRACE, "load version: " << binver );
     SetLoadVersion( binver );
     u16 end_check = 0;
 
-    fz >> World::Get() >> Settings::Get() >> GameOver::Result::Get() >> GameStatic::Data::Get() >> MonsterStaticData::Get() >> end_check;
+    fz >> World::Get() >> conf;
+    if ( ( conf.GameType() & Game::TYPE_CAMPAIGN ) != 0 && Game::GetLoadVersion() == FORMAT_VERSION_084_RELEASE ) {
+        fz >> Campaign::CampaignSaveData::Get();
+    }
+
+    fz >> GameOver::Result::Get() >> GameStatic::Data::Get() >> MonsterStaticData::Get();
+    if ( conf.loadedFileLanguage() != "en" && conf.loadedFileLanguage() != conf.ForceLang() && !conf.Unicode() ) {
+        std::string warningMessage( "This is an saved game is localized for lang = " );
+        warningMessage.append( conf.loadedFileLanguage() );
+        warningMessage.append( ", and most of the messages will be displayed incorrectly.\n \n" );
+        warningMessage.append( "(tip: set unicode = on)" );
+        Dialog::Message( "Warning!", warningMessage, Font::BIG, Dialog::OK );
+    }
+
+    if ( fileGameType & Game::TYPE_CAMPAIGN && binver >= FORMAT_VERSION_090_RELEASE )
+        fz >> Campaign::CampaignSaveData::Get();
+
+    fz >> end_check;
 
     if ( fz.fail() || ( end_check != SAV2ID2 && end_check != SAV2ID3 ) ) {
-        DEBUG( DBG_GAME, DBG_WARN, "invalid load file: " << fn );
+        DEBUG_LOG( DBG_GAME, DBG_WARN, "invalid load file: " << fn );
         return false;
     }
 
@@ -272,7 +293,7 @@ bool Game::LoadSAV2FileInfo( const std::string & fn, Maps::FileInfo & finfo )
     fs.setbigendian( true );
 
     if ( !fs.open( fn, "rb" ) ) {
-        DEBUG( DBG_GAME, DBG_INFO, fn << ", error open" );
+        DEBUG_LOG( DBG_GAME, DBG_INFO, fn << ", error open" );
         return false;
     }
 
@@ -282,7 +303,7 @@ bool Game::LoadSAV2FileInfo( const std::string & fn, Maps::FileInfo & finfo )
 
     // check version sav file
     if ( savid != SAV2ID2 && savid != SAV2ID3 ) {
-        DEBUG( DBG_GAME, DBG_INFO, fn << ", incorrect SAV2ID" );
+        DEBUG_LOG( DBG_GAME, DBG_INFO, fn << ", incorrect SAV2ID" );
         return false;
     }
 
@@ -299,7 +320,7 @@ bool Game::LoadSAV2FileInfo( const std::string & fn, Maps::FileInfo & finfo )
     int fileGameType = Game::TYPE_STANDARD;
     HeaderSAVBase header;
     // starting from 0.9.0, headers also include gameType
-    if ( binver >= FORMAT_VERSION_090_RELEASE ) {
+    if ( binver >= FORMAT_VERSION_084_RELEASE ) {
         HeaderSAV currentFormatHeader;
         fs >> currentFormatHeader;
 
@@ -316,7 +337,7 @@ bool Game::LoadSAV2FileInfo( const std::string & fn, Maps::FileInfo & finfo )
 #ifndef WITH_ZLIB
     // check: compress game data
     if ( header.status & HeaderSAV::IS_COMPRESS ) {
-        DEBUG( DBG_GAME, DBG_INFO, fn << ", zlib: unsupported" );
+        DEBUG_LOG( DBG_GAME, DBG_INFO, fn << ", zlib: unsupported" );
         return false;
     }
 #endif

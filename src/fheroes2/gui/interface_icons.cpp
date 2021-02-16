@@ -30,8 +30,8 @@
 #include "heroes.h"
 #include "interface_icons.h"
 #include "kingdom.h"
+#include "logging.h"
 #include "race.h"
-#include "settings.h"
 #include "world.h"
 
 #define ICONS_WIDTH 46
@@ -81,7 +81,7 @@ void Interface::RedrawCastleIcon( const Castle & castle, s32 sx, s32 sy )
         index_sprite = castle.isCastle() ? 14 : 20;
         break;
     default:
-        DEBUG( DBG_ENGINE, DBG_WARN, "unknown race" );
+        DEBUG_LOG( DBG_ENGINE, DBG_WARN, "unknown race" );
     }
 
     fheroes2::Blit( fheroes2::AGG::GetICN( evil ? ICN::LOCATORE : ICN::LOCATORS, index_sprite ), display, sx, sy );
@@ -192,7 +192,8 @@ void Interface::CastleIcons::ActionListPressRight( CASTLE & item )
 {
     if ( item ) {
         Cursor::Get().Hide();
-        Dialog::QuickInfo( *item );
+        const fheroes2::Point p( _topLeftCorner.x - 1, _topLeftCorner.y );
+        Dialog::QuickInfo( *item, p );
     }
 }
 
@@ -212,7 +213,8 @@ void Interface::CastleIcons::SetPos( s32 px, s32 py )
 {
     const int icnscroll = Settings::Get().ExtGameEvilInterface() ? ICN::SCROLLE : ICN::SCROLL;
 
-    SetTopLeft( Point( px, py ) );
+    _topLeftCorner = Point( px, py );
+    SetTopLeft( _topLeftCorner );
     SetScrollBar( fheroes2::AGG::GetICN( icnscroll, 4 ), fheroes2::Rect( px + ICONS_CURSOR_WIDTH + 3, py + 19, 10, ICONS_CURSOR_HEIGHT * iconsCount - 38 ) );
     SetScrollButtonUp( icnscroll, 0, 1, fheroes2::Point( px + ICONS_CURSOR_WIDTH + 1, py + 1 ) );
     SetScrollButtonDn( icnscroll, 2, 3, fheroes2::Point( px + ICONS_CURSOR_WIDTH + 1, py + iconsCount * ICONS_CURSOR_HEIGHT - 15 ) );
@@ -259,7 +261,7 @@ void Interface::HeroesIcons::ActionListDoubleClick( HEROES & item )
                 Game::OpenCastleDialog( *castle );
         }
         else
-            Game::OpenHeroesDialog( *item, false );
+            Game::OpenHeroesDialog( *item, false, true );
     }
 }
 
@@ -278,7 +280,8 @@ void Interface::HeroesIcons::ActionListPressRight( HEROES & item )
 {
     if ( item ) {
         Cursor::Get().Hide();
-        Dialog::QuickInfo( *item );
+        const fheroes2::Point p( _topLeftCorner.x - 1, _topLeftCorner.y );
+        Dialog::QuickInfo( *item, p );
     }
 }
 
@@ -298,7 +301,8 @@ void Interface::HeroesIcons::SetPos( s32 px, s32 py )
 {
     const int icnscroll = Settings::Get().ExtGameEvilInterface() ? ICN::SCROLLE : ICN::SCROLL;
 
-    SetTopLeft( Point( px, py ) );
+    _topLeftCorner = Point( px, py );
+    SetTopLeft( _topLeftCorner );
     SetScrollBar( fheroes2::AGG::GetICN( icnscroll, 4 ), fheroes2::Rect( px + ICONS_CURSOR_WIDTH + 3, py + 19, 10, ICONS_CURSOR_HEIGHT * iconsCount - 38 ) );
     SetScrollButtonUp( icnscroll, 0, 1, fheroes2::Point( px + ICONS_CURSOR_WIDTH + 1, py + 1 ) );
     SetScrollButtonDn( icnscroll, 2, 3, fheroes2::Point( px + ICONS_CURSOR_WIDTH + 1, py + iconsCount * ICONS_CURSOR_HEIGHT - 15 ) );

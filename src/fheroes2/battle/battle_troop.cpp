@@ -34,9 +34,10 @@
 #include "game.h"
 #include "game_static.h"
 #include "heroes.h"
+#include "logging.h"
 #include "luck.h"
 #include "morale.h"
-#include "settings.h"
+#include "rand.h"
 #include "speed.h"
 #include "world.h"
 
@@ -208,7 +209,7 @@ bool Battle::Unit::isModes( u32 v ) const
 std::string Battle::Unit::GetShotString( void ) const
 {
     if ( Troop::GetShots() == GetShots() )
-        return GetString( Troop::GetShots() );
+        return std::to_string( Troop::GetShots() );
 
     std::ostringstream os;
     os << Troop::GetShots() << " (" << GetShots() << ")";
@@ -506,7 +507,7 @@ u32 Battle::Unit::CalculateDamageUnit( const Unit & enemy, double dmg ) const
             }
 
             // check castle defense
-            if ( GetArena()->GetObstaclesPenalty( *this, enemy ) )
+            if ( GetArena()->IsShootingPenalty( *this, enemy ) )
                 dmg /= 2;
 
             // check spell shield
@@ -603,7 +604,7 @@ u32 Battle::Unit::ApplyDamage( u32 dmg )
             killed = GetCount();
         }
 
-        DEBUG( DBG_BATTLE, DBG_TRACE, dmg << " to " << String() << " and killed: " << killed );
+        DEBUG_LOG( DBG_BATTLE, DBG_TRACE, dmg << " to " << String() << " and killed: " << killed );
 
         if ( killed >= GetCount() ) {
             dead += GetCount();
@@ -660,7 +661,7 @@ void Battle::Unit::PostKilledAction( void )
     if ( tail )
         tail->SetUnit( NULL );
 
-    DEBUG( DBG_BATTLE, DBG_TRACE, String() << ", is dead..." );
+    DEBUG_LOG( DBG_BATTLE, DBG_TRACE, String() << ", is dead..." );
     // possible also..
 }
 
@@ -699,14 +700,14 @@ u32 Battle::Unit::ApplyDamage( Unit & enemy, u32 dmg )
         switch ( enemy.GetID() ) {
         case Monster::GHOST:
             resurrect = killed * static_cast<Monster &>( enemy ).GetHitPoints();
-            DEBUG( DBG_BATTLE, DBG_TRACE, String() << ", enemy: " << enemy.String() << " resurrect: " << resurrect );
+            DEBUG_LOG( DBG_BATTLE, DBG_TRACE, String() << ", enemy: " << enemy.String() << " resurrect: " << resurrect );
             // grow troop
             enemy.Resurrect( resurrect, true, false );
             break;
 
         case Monster::VAMPIRE_LORD:
             resurrect = killed * Monster::GetHitPoints();
-            DEBUG( DBG_BATTLE, DBG_TRACE, String() << ", enemy: " << enemy.String() << " resurrect: " << resurrect );
+            DEBUG_LOG( DBG_BATTLE, DBG_TRACE, String() << ", enemy: " << enemy.String() << " resurrect: " << resurrect );
             // restore hit points
             enemy.Resurrect( resurrect, false, false );
             break;
@@ -733,11 +734,13 @@ u32 Battle::Unit::ApplyDamage( Unit & enemy, u32 dmg )
 
 bool Battle::Unit::AllowApplySpell( const Spell & spell, const HeroBase * hero, std::string * msg, bool forceApplyToAlly ) const
 {
-    if ( Modes( SP_ANTIMAGIC ) )
+    if ( Modes( CAP_MIRRORIMAGE ) && ( spell == Spell::ANTIMAGIC || spell == Spell::MIRRORIMAGE ) ) {
         return false;
+    }
 
-    if ( ( Modes( CAP_MIRRORIMAGE ) || Modes( CAP_MIRROROWNER ) ) && ( spell == Spell::ANTIMAGIC || spell == Spell::MIRRORIMAGE ) )
+    if ( Modes( CAP_MIRROROWNER ) && spell == Spell::MIRRORIMAGE ) {
         return false;
+    }
 
     // check global
     // if(GetArena()->DisableCastSpell(spell, msg)) return false; // disable - recursion!
@@ -808,7 +811,7 @@ bool Battle::Unit::ApplySpell( const Spell & spell, const HeroBase * hero, Targe
     if ( !AllowApplySpell( spell, hero, NULL, isForceApply ) )
         return false;
 
-    DEBUG( DBG_BATTLE, DBG_TRACE, spell.GetName() << " to " << String() );
+    DEBUG_LOG( DBG_BATTLE, DBG_TRACE, spell.GetName() << " to " << String() );
 
     const u32 spoint = hero ? hero->GetPower() : DEFAULT_SPELL_DURATION;
 
@@ -1451,6 +1454,9 @@ bool Battle::Unit::isMagicResist( const Spell & spell, u32 spower ) const
 
 u32 Battle::Unit::GetMagicResist( const Spell & spell, u32 spower ) const
 {
+    if ( Modes( SP_ANTIMAGIC ) )
+        return 100;
+
     if ( spell.isMindInfluence() && ( isUndead() || isElemental() || GetID() == Monster::GIANT || GetID() == Monster::TITAN ) )
         return 100;
 

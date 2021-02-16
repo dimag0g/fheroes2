@@ -20,10 +20,10 @@
 
 #include <set>
 
-#include "world_pathfinding.h"
-#include "ai.h"
 #include "ground.h"
+#include "logging.h"
 #include "world.h"
+#include "world_pathfinding.h"
 
 bool isTileBlockedForArmy( int tileIndex, int color, double armyStrength, bool fromWater )
 {
@@ -31,9 +31,7 @@ bool isTileBlockedForArmy( int tileIndex, int color, double armyStrength, bool f
     const bool toWater = tile.isWater();
     const int object = tile.GetObject();
 
-    if ( object == MP2::OBJ_BOAT )
-        return true;
-
+    // Special cases: check if we can defeat the Hero/Monster and pass through
     if ( object == MP2::OBJ_HEROES ) {
         const Heroes * otherHero = tile.GetHeroes();
         if ( otherHero ) {
@@ -46,6 +44,14 @@ bool isTileBlockedForArmy( int tileIndex, int color, double armyStrength, bool f
 
     if ( object == MP2::OBJ_MONSTER || ( object == MP2::OBJ_ARTIFACT && tile.QuantityVariant() > 5 ) )
         return Army( tile ).GetStrength() > armyStrength;
+
+    // check if AI has the key for the barrier
+    if ( object == MP2::OBJ_BARRIER && world.GetKingdom( color ).IsVisitTravelersTent( tile.QuantityColor() ) )
+        return false;
+
+    // if none of the special cases apply, check if tile can be moved on
+    if ( MP2::isNeedStayFront( object ) )
+        return true;
 
     return ( fromWater && !toWater && object == MP2::OBJ_COAST );
 }
@@ -68,7 +74,7 @@ bool World::isTileBlocked( int tileIndex, bool fromWater ) const
     return false;
 }
 
-bool World::isValidPath( int index, int direction ) const
+bool World::isValidPath( int index, int direction, const int heroColor ) const
 {
     const Maps::Tiles & fromTile = GetTiles( index );
     const Maps::Tiles & toTile = GetTiles( Maps::GetDirectionIndex( index, direction ) );
@@ -103,10 +109,10 @@ bool World::isValidPath( int index, int direction ) const
         }
     }
 
-    if ( !fromTile.isPassable( direction, fromWater, false ) )
+    if ( !fromTile.isPassable( direction, fromWater, false, heroColor ) )
         return false;
 
-    return toTile.isPassable( Direction::Reflect( direction ), fromWater, false );
+    return toTile.isPassable( Direction::Reflect( direction ), fromWater, false, heroColor );
 }
 
 void WorldPathfinder::checkWorldSize()
@@ -180,7 +186,7 @@ void WorldPathfinder::checkAdjacentNodes( std::vector<int> & nodesToExplore, int
 
             const uint32_t moveCost = currentNode._cost + getMovementPenalty( currentNodeIdx, newIndex, directions[i], _pathfindingSkill );
             PathfindingNode & newNode = _cache[newIndex];
-            if ( world.isValidPath( currentNodeIdx, directions[i] ) && ( newNode._from == -1 || newNode._cost > moveCost ) ) {
+            if ( world.isValidPath( currentNodeIdx, directions[i], _currentColor ) && ( newNode._from == -1 || newNode._cost > moveCost ) ) {
                 const Maps::Tiles & tile = world.GetTiles( newIndex );
 
                 newNode._from = currentNodeIdx;
@@ -201,6 +207,7 @@ void PlayerWorldPathfinder::reset()
 
     if ( _pathStart != -1 ) {
         _pathStart = -1;
+        _currentColor = Color::NONE;
         _pathfindingSkill = Skill::Level::EXPERT;
     }
 }
@@ -212,6 +219,7 @@ void PlayerWorldPathfinder::reEvaluateIfNeeded( const Heroes & hero )
 
     if ( _pathStart != startIndex || _pathfindingSkill != skill ) {
         _pathStart = startIndex;
+        _currentColor = hero.GetColor();
         _pathfindingSkill = skill;
 
         processWorldMap( startIndex );
@@ -232,12 +240,17 @@ std::list<Route::Step> PlayerWorldPathfinder::buildPath( int targetIndex ) const
 
         // Sanity check
         if ( node._from != -1 && _cache[node._from]._from == currentNode ) {
-            DEBUG( DBG_GAME, DBG_WARN, "Circular path found! " << node._from << " to " << currentNode );
+            DEBUG_LOG( DBG_GAME, DBG_WARN, "Circular path found! " << node._from << " to " << currentNode );
             break;
         }
         else {
             currentNode = node._from;
         }
+    }
+
+    // Check a corner case when a path is blocked by something else and the destination is not reachable anymore.
+    if ( currentNode == -1 && path.size() == 1 ) {
+        path.clear();
     }
 
     return path;
@@ -253,7 +266,7 @@ void PlayerWorldPathfinder::processCurrentNode( std::vector<int> & nodesToExplor
         for ( int monsterIndex : monsters ) {
             const int direction = Maps::GetDirection( currentNodeIdx, monsterIndex );
 
-            if ( direction != Direction::UNKNOWN && direction != Direction::CENTER && world.isValidPath( currentNodeIdx, direction ) ) {
+            if ( direction != Direction::UNKNOWN && direction != Direction::CENTER && world.isValidPath( currentNodeIdx, direction, _currentColor ) ) {
                 // add straight to cache, can't move further from the monster
                 const uint32_t moveCost = _cache[currentNodeIdx]._cost + getMovementPenalty( currentNodeIdx, monsterIndex, direction, _pathfindingSkill );
                 PathfindingNode & monsterNode = _cache[monsterIndex];
@@ -288,7 +301,7 @@ void AIWorldPathfinder::reEvaluateIfNeeded( const Heroes & hero )
 
 void AIWorldPathfinder::reEvaluateIfNeeded( int start, int color, double armyStrength, uint8_t skill )
 {
-    if ( _pathStart != start || _currentColor != color || _armyStrength != armyStrength || _pathfindingSkill != skill ) {
+    if ( _pathStart != start || _currentColor != color || std::fabs( _armyStrength - armyStrength ) > 0.001 || _pathfindingSkill != skill ) {
         _pathStart = start;
         _currentColor = color;
         _armyStrength = armyStrength;
@@ -438,7 +451,7 @@ std::vector<IndexObject> AIWorldPathfinder::getObjectsOnTheWay( int targetIndex,
 
         // Sanity check
         if ( node._from != -1 && _cache[node._from]._from == currentNode ) {
-            DEBUG( DBG_GAME, DBG_WARN, "Circular path found! " << node._from << " to " << currentNode );
+            DEBUG_LOG( DBG_GAME, DBG_WARN, "Circular path found! " << node._from << " to " << currentNode );
             break;
         }
 
@@ -448,7 +461,7 @@ std::vector<IndexObject> AIWorldPathfinder::getObjectsOnTheWay( int targetIndex,
     return result;
 }
 
-std::list<Route::Step> AIWorldPathfinder::buildPath( int targetIndex ) const
+std::list<Route::Step> AIWorldPathfinder::buildPath( int targetIndex, bool isPlanningMode ) const
 {
     std::list<Route::Step> path;
     if ( _pathStart == -1 )
@@ -471,7 +484,7 @@ std::list<Route::Step> AIWorldPathfinder::buildPath( int targetIndex ) const
 
         // Sanity check
         if ( node._from != -1 && _cache[node._from]._from == currentNode ) {
-            DEBUG( DBG_GAME, DBG_WARN, "Circular path found! " << node._from << " to " << currentNode );
+            DEBUG_LOG( DBG_GAME, DBG_WARN, "Circular path found! " << node._from << " to " << currentNode );
             break;
         }
         else {
@@ -479,8 +492,8 @@ std::list<Route::Step> AIWorldPathfinder::buildPath( int targetIndex ) const
         }
     }
 
-    // Cut the path to the last valid tile
-    if ( lastValidNode != targetIndex ) {
+    // Cut the path to the last valid tile/obstacle if not in planning mode
+    if ( !isPlanningMode && lastValidNode != targetIndex ) {
         path.erase( std::find_if( path.begin(), path.end(), [&lastValidNode]( const Route::Step & step ) { return step.GetFrom() == lastValidNode; } ), path.end() );
     }
 

@@ -33,11 +33,12 @@
 #include "game_interface.h"
 #include "gamedefs.h"
 #include "kingdom.h"
+#include "logging.h"
 #include "maps_fileinfo.h"
 #include "mus.h"
 #include "player_info.h"
 #include "race.h"
-#include "settings.h"
+#include "system.h"
 #include "text.h"
 #include "ui_button.h"
 #include "ui_tool.h"
@@ -127,11 +128,11 @@ int Game::ScenarioInfo( void )
 
     const uint32_t ngextraWidth = ngextra.width();
     const uint32_t ngextraHeight = ngextra.height();
-    coordDifficulty.push_back( Rect( rectPanel.x + 21, rectPanel.y + 91, ngextraWidth, ngextraHeight ) );
-    coordDifficulty.push_back( Rect( rectPanel.x + 98, rectPanel.y + 91, ngextraWidth, ngextraHeight ) );
-    coordDifficulty.push_back( Rect( rectPanel.x + 174, rectPanel.y + 91, ngextraWidth, ngextraHeight ) );
-    coordDifficulty.push_back( Rect( rectPanel.x + 251, rectPanel.y + 91, ngextraWidth, ngextraHeight ) );
-    coordDifficulty.push_back( Rect( rectPanel.x + 328, rectPanel.y + 91, ngextraWidth, ngextraHeight ) );
+    coordDifficulty.emplace_back( rectPanel.x + 21, rectPanel.y + 91, ngextraWidth, ngextraHeight );
+    coordDifficulty.emplace_back( rectPanel.x + 98, rectPanel.y + 91, ngextraWidth, ngextraHeight );
+    coordDifficulty.emplace_back( rectPanel.x + 174, rectPanel.y + 91, ngextraWidth, ngextraHeight );
+    coordDifficulty.emplace_back( rectPanel.x + 251, rectPanel.y + 91, ngextraWidth, ngextraHeight );
+    coordDifficulty.emplace_back( rectPanel.x + 328, rectPanel.y + 91, ngextraWidth, ngextraHeight );
 
     fheroes2::Button buttonSelectMaps( rectPanel.x + 309, rectPanel.y + 45, ICN::NGEXTRA, 64, 65 );
     fheroes2::Button buttonOk( rectPanel.x + 31, rectPanel.y + 380, ICN::NGEXTRA, 66, 67 );
@@ -257,7 +258,7 @@ int Game::ScenarioInfo( void )
         else
             // click ok
             if ( HotKeyPressEvent( EVENT_DEFAULT_READY ) || le.MouseClickLeft( buttonOk.area() ) ) {
-            DEBUG( DBG_GAME, DBG_INFO, "select maps: " << conf.MapsFile() << ", difficulty: " << Difficulty::String( conf.GameDifficulty() ) );
+            DEBUG_LOG( DBG_GAME, DBG_INFO, "select maps: " << conf.MapsFile() << ", difficulty: " << Difficulty::String( conf.GameDifficulty() ) );
             result = STARTGAME;
             break;
         }
@@ -335,16 +336,16 @@ int Game::ScenarioInfo( void )
             }
             else {
                 result = MAINMENU;
-                DEBUG( DBG_GAME, DBG_WARN,
-                       conf.MapsFile() << ", "
-                                       << "unknown map format" );
+                DEBUG_LOG( DBG_GAME, DBG_WARN,
+                           conf.MapsFile() << ", "
+                                           << "unknown map format" );
             }
         }
         else {
             result = MAINMENU;
-            DEBUG( DBG_GAME, DBG_WARN,
-                   conf.MapsFile() << ", "
-                                   << "unknown map format" );
+            DEBUG_LOG( DBG_GAME, DBG_WARN,
+                       conf.MapsFile() << ", "
+                                       << "unknown map format" );
         }
     }
 

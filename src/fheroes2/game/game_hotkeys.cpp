@@ -27,8 +27,9 @@
 #include "game.h"
 #include "game_interface.h"
 #include "gamedefs.h"
+#include "localevent.h"
+#include "logging.h"
 #include "settings.h"
-#include "system.h"
 #include "tinyconfig.h"
 
 namespace Game
@@ -54,7 +55,7 @@ const char * Game::EventsName( int evnt )
         return "button credits";
     case EVENT_BUTTON_STANDARD:
         return "button standard";
-    case EVENT_BUTTON_CAMPAIN:
+    case EVENT_BUTTON_CAMPAIGN:
         return "button campain";
     case EVENT_BUTTON_MULTI:
         return "button multigame";
@@ -183,7 +184,7 @@ void Game::HotKeysDefaults( void )
     key_events[EVENT_BUTTON_HIGHSCORES] = KEY_h;
     key_events[EVENT_BUTTON_CREDITS] = KEY_c;
     key_events[EVENT_BUTTON_STANDARD] = KEY_s;
-    key_events[EVENT_BUTTON_CAMPAIN] = KEY_c;
+    key_events[EVENT_BUTTON_CAMPAIGN] = KEY_c;
     key_events[EVENT_BUTTON_MULTI] = KEY_m;
     key_events[EVENT_BUTTON_SETTINGS] = KEY_t;
     key_events[EVENT_BUTTON_SELECT] = KEY_s;
@@ -266,6 +267,7 @@ void Game::HotKeysDefaults( void )
     // split
     key_events[EVENT_STACKSPLIT_SHIFT] = KEY_SHIFT;
     key_events[EVENT_STACKSPLIT_CTRL] = KEY_CONTROL;
+    key_events[EVENT_JOINSTACKS] = KEY_ALT;
 }
 
 bool Game::HotKeyPressEvent( int evnt )
@@ -294,7 +296,7 @@ void Game::HotKeysLoad( const std::string & hotkeys )
                 if ( ival ) {
                     const KeySym sym = GetKeySym( ival );
                     key_events[evnt] = sym;
-                    DEBUG( DBG_GAME, DBG_INFO, "events: " << EventsName( evnt ) << ", key: " << KeySymGetName( sym ) );
+                    DEBUG_LOG( DBG_GAME, DBG_INFO, "events: " << EventsName( evnt ) << ", key: " << KeySymGetName( sym ) );
                 }
             }
         }
@@ -303,25 +305,16 @@ void Game::HotKeysLoad( const std::string & hotkeys )
 
 void Game::KeyboardGlobalFilter( int sym, int mod )
 {
-    fheroes2::Display & display = fheroes2::Display::instance();
-
     // system hotkeys
     if ( sym == key_events[EVENT_SYSTEM_FULLSCREEN] && !( ( mod & KMOD_ALT ) || ( mod & KMOD_CTRL ) ) ) {
         Cursor::Get().Hide();
         fheroes2::engine().toggleFullScreen();
         Cursor::Get().Show();
-        display.render();
+        fheroes2::Display::instance().render();
+
+        Settings & conf = Settings::Get();
+        conf.setFullScreen( fheroes2::engine().isFullScreen() );
+        conf.Save( "fheroes2.cfg" );
     }
-//     else if ( sym == key_events[EVENT_SYSTEM_SCREENSHOT] ) {
-//         std::ostringstream stream;
-//         stream << System::ConcatePath( Settings::GetSaveDir(), "screenshot_" ) << std::time( 0 );
-//
-// #ifndef WITH_IMAGE
-//         stream << ".bmp";
-// #else
-//         stream << ".png";
-// #endif
-//         if ( display.Save( stream.str().c_str() ) )
-//             DEBUG( DBG_GAME, DBG_INFO, "save: " << stream.str() );
-//     }
+    // DEBUG_LOG( DBG_GAME, DBG_INFO, "save: " << stream.str() );
 }

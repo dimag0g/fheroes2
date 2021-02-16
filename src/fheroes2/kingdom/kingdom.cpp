@@ -30,10 +30,10 @@
 #include "game_interface.h"
 #include "game_static.h"
 #include "kingdom.h"
+#include "logging.h"
 #include "players.h"
 #include "profit.h"
 #include "race.h"
-#include "settings.h"
 #include "visit.h"
 #include "world.h"
 
@@ -62,7 +62,7 @@ void Kingdom::Init( int clr )
         UpdateStartingResource();
     }
     else {
-        DEBUG( DBG_GAME, DBG_INFO, "Kingdom: unknown player: " << Color::String( color ) << "(" << static_cast<int>( color ) << ")" );
+        DEBUG_LOG( DBG_GAME, DBG_INFO, "Kingdom: unknown player: " << Color::String( color ) << "(" << static_cast<int>( color ) << ")" );
     }
 }
 
@@ -188,7 +188,7 @@ void Kingdom::ActionNewWeek( void )
         // debug an gift
         if ( IS_DEVEL() && isControlHuman() ) {
             Funds gift( 20, 20, 10, 10, 10, 10, 5000 );
-            DEBUG( DBG_GAME, DBG_INFO, "debug gift: " << gift.String() );
+            DEBUG_LOG( DBG_GAME, DBG_INFO, "debug gift: " << gift.String() );
             resource += gift;
         }
     }
@@ -529,7 +529,7 @@ u32 Kingdom::GetMaxHeroes( void )
     return GameStatic::GetKingdomMaxHeroes();
 }
 
-void Kingdom::HeroesActionNewPosition( void )
+void Kingdom::HeroesActionNewPosition() const
 {
     // Heroes::ActionNewPosition: can remove elements from heroes vector.
     KingdomHeroes heroes2( heroes );
@@ -811,6 +811,20 @@ void Kingdoms::AddTributeEvents( CapturedObjects & captureobj, u32 day, int obj 
                 world.AddEventDate( event );
             }
         }
+}
+
+// Check if tile is visible from any crystal ball of any hero
+bool Kingdom::IsTileVisibleFromCrystalBall( const int32_t dest ) const
+{
+    for ( const Heroes * hero : heroes ) {
+        if ( hero->HasArtifact( Artifact::CRYSTAL_BALL ) ) {
+            const uint32_t crystalBallDistance = hero->GetVisionsDistance();
+            if ( Maps::GetApproximateDistance( hero->GetIndex(), dest ) <= crystalBallDistance ) {
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 StreamBase & operator<<( StreamBase & msg, const Kingdom & kingdom )
