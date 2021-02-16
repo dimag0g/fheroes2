@@ -31,7 +31,7 @@ namespace Logging
 #if defined( __SWITCH__ ) // Platforms which log to file
     std::ofstream logFile;
 #endif
-	
+
     const char * GetDebugOptionName( const int name )
     {
         if ( name & DBG_ENGINE )

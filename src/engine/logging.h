@@ -100,8 +100,8 @@ namespace Logging
 }
 #define COUT( x )                                                                                                                                                        \
     {                                                                                                                                                                    \
-        Logging::logFile << x << std::endl;                                                                                                                                      \
-        Logging::logFile.flush();                                                                                                                                                \
+        Logging::logFile << x << std::endl;                                                                                                                              \
+        Logging::logFile.flush();                                                                                                                                        \
     }
 #else // Default: log to STDERR
 #define COUT( x )                                                                                                                                                        \
