@@ -1,4 +1,4 @@
-name: OSX (release)
+name: macOS (release)
 
 on:
   push:
@@ -13,10 +13,7 @@ jobs:
         fetch-depth: 50
     - name: install SDL 1
       run: |
-        brew install sdl
-        brew install sdl_ttf
-        brew install sdl_mixer
-        brew install sdl_image
+        brew install sdl sdl_ttf sdl_mixer sdl_image
     - name: compile
       run: make -j 2
       env:
@@ -26,10 +23,10 @@ jobs:
     - name: create package
       run: |
         cp doc/README.txt .
-        zip fheroes2_osx_sdl1.zip fheroes2 LICENSE fheroes2.key script/macos/install_sdl_1.sh script/demo/demo_macos.sh changelog.txt README.txt
+        zip fheroes2_macos10_15_sdl1.zip fheroes2 LICENSE fheroes2.key script/macos/install_sdl_1.sh script/demo/demo_macos.sh changelog.txt README.txt
     - uses: ncipollo/release-action@v1
       with:
-        artifacts: fheroes2_osx_sdl1.zip
+        artifacts: fheroes2_macos10_15_sdl1.zip
         body: Compiled version of ${{ github.sha }} commit
         token: ${{ secrets.GITHUB_TOKEN }}
         name: MacOS build with SDL 1 support (latest commit)
@@ -45,10 +42,7 @@ jobs:
         fetch-depth: 50
     - name: install SDL 2
       run: |
-        brew install sdl2
-        brew install sdl2_ttf
-        brew install sdl2_mixer
-        brew install sdl2_image
+        brew install sdl2 sdl2_ttf sdl2_mixer sdl2_image
     - name: compile
       run: make -j 2
       env:
@@ -57,10 +51,10 @@ jobs:
     - name: create package
       run: |
         cp doc/README.txt .
-        zip fheroes2_osx_sdl2.zip fheroes2 LICENSE fheroes2.key script/macos/install_sdl_2.sh script/demo/demo_macos.sh  changelog.txt README.txt
+        zip fheroes2_macos10_15_sdl2.zip fheroes2 LICENSE fheroes2.key script/macos/install_sdl_2.sh script/demo/demo_macos.sh changelog.txt README.txt
     - uses: ncipollo/release-action@v1
       with:
-        artifacts: fheroes2_osx_sdl2.zip
+        artifacts: fheroes2_macos10_15_sdl2.zip
         body: Compiled version of ${{ github.sha }} commit
         token: ${{ secrets.GITHUB_TOKEN }}
         name: MacOS build with SDL 2 support (latest commit)

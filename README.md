@@ -47,13 +47,18 @@ In the end you should have the following directory tree on your SD card:
 This build of Free Heroes 2 was tested on 10.2.0|AMS 0.14.4|S (FAT32). exFAT is not recommended.
 Alternative controllers (keyboards, mouses, etc.) might work but weren't tested.
 
-Working controls controls are:
+Working controls are:
 - Touchscreen - emulates mouse, including dragging
 - L-stick - move mouse cursor
+- R-stick/D-pad - scroll
 - A - left mouse click
 - B - Right mouse click
 - X - Escape
 - Y - Enter
+- (+) - Cast spell
+- (-) - End turn
+- R - Cycle through towns
+- L - Cycle through heroes
 
 
 [4] TODO

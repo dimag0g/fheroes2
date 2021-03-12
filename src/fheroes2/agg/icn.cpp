@@ -920,7 +920,6 @@ namespace ICN
                                {BTNBATTLEONLY, "BTNBONLY.ICN"},
                                {BOAT12, "BOAT12.ICN"},
                                {BTNGIFT, "BTNGIFT.ICN"},
-                               {BTNMIN, "BTNMIN.ICN"},
                                {CSLMARKER, "CSLMARKER.ICN"}};
 }
 
@@ -1651,7 +1650,7 @@ int ICN::PORTxxxx( int heroId )
     case Heroes::JARKONAS:
         return ICN::PORT0070;
 
-    case Heroes::SANDYSANDY:
+    case Heroes::DEBUG_HERO:
         return ICN::PORT0059;
 
     default:

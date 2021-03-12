@@ -187,7 +187,7 @@ void Battle::Unit::UpdateDirection( void )
 
 bool Battle::Unit::UpdateDirection( const Rect & pos )
 {
-    bool need = position.GetRect().x > pos.x;
+    bool need = position.GetRect().x == pos.x ? reflect : position.GetRect().x > pos.x;
 
     if ( need != reflect ) {
         SetReflection( need );
@@ -358,7 +358,7 @@ bool Battle::Unit::canReach( int index ) const
 
     const bool isIndirectAttack = isReflect() == Board::isNegativeDistance( GetHeadIndex(), index );
     const int from = ( isWide() && isIndirectAttack ) ? GetTailIndex() : GetHeadIndex();
-    return static_cast<uint32_t>( Board::GetDistance( from, index ) ) <= GetSpeed( true );
+    return Board::GetDistance( from, index ) <= GetSpeed( true );
 }
 
 bool Battle::Unit::canReach( const Unit & unit ) const
@@ -468,6 +468,11 @@ u32 Battle::Unit::GetSpeed( bool skip_standing_check ) const
     return speed;
 }
 
+uint32_t Battle::Unit::GetMoveRange() const
+{
+    return isFlying() ? ARENASIZE : GetSpeed( false );
+}
+
 uint32_t Battle::Unit::CalculateRetaliationDamage( uint32_t damageTaken ) const
 {
     // Check if there will be retaliation in the first place
@@ -559,7 +564,7 @@ u32 Battle::Unit::CalculateDamageUnit( const Unit & enemy, double dmg ) const
         r += Spell( Spell::DRAGONSLAYER ).ExtraValue();
 
     // Attack bonus is 20% to 300%
-    dmg *= 1 + ( 0 < r ? 0.1f * std::min( r, 20 ) : 0.05f * std::max( r, -16 ) );
+    dmg *= 1 + ( 0 < r ? 0.1 * std::min( r, 20 ) : 0.05 * std::max( r, -16 ) );
 
     return static_cast<u32>( dmg ) < 1 ? 1 : static_cast<u32>( dmg );
 }

@@ -68,7 +68,7 @@ Battle::Result Battle::Loader( Army & army1, Army & army2, s32 mapsindex )
         if ( army1.GetCommander()->isCaptain() )
             army1.GetCommander()->ActionPreBattle();
         else if ( army1.isControlAI() )
-            AI::Get().HeroesPreBattle( *army1.GetCommander() );
+            AI::Get().HeroesPreBattle( *army1.GetCommander(), true );
         else
             army1.GetCommander()->ActionPreBattle();
     }
@@ -78,22 +78,23 @@ Battle::Result Battle::Loader( Army & army1, Army & army2, s32 mapsindex )
         if ( army2.GetCommander()->isCaptain() )
             army2.GetCommander()->ActionPreBattle();
         else if ( army2.isControlAI() )
-            AI::Get().HeroesPreBattle( *army2.GetCommander() );
+            AI::Get().HeroesPreBattle( *army2.GetCommander(), false );
         else
             army2.GetCommander()->ActionPreBattle();
     }
 
-    bool local = army1.isControlHuman() || army2.isControlHuman();
+    const bool isHumanBattle = army1.isControlHuman() || army2.isControlHuman();
+    bool showBattle = !Settings::Get().BattleAutoResolve() && isHumanBattle;
 
 #ifdef WITH_DEBUG
     if ( IS_DEBUG( DBG_BATTLE, DBG_TRACE ) )
-        local = true;
+        showBattle = true;
 #endif
 
-    if ( local )
+    if ( showBattle )
         AGG::ResetMixer();
 
-    Arena arena( army1, army2, mapsindex, local );
+    Arena arena( army1, army2, mapsindex, showBattle );
 
     DEBUG_LOG( DBG_BATTLE, DBG_INFO, "army1 " << army1.String() );
     DEBUG_LOG( DBG_BATTLE, DBG_INFO, "army2 " << army2.String() );
@@ -113,15 +114,17 @@ Battle::Result Battle::Loader( Army & army1, Army & army2, s32 mapsindex )
         = ( hero_wins && hero_loss && !( ( RESULT_RETREAT | RESULT_SURRENDER ) & loss_result ) && hero_wins->isHeroes() && hero_loss->isHeroes() );
     bool artifactsTransferred = !transferArtifacts;
 
-    if ( local ) {
+    if ( showBattle ) {
         AGG::ResetMixer();
 
         // fade arena
         const bool clearMessageLog
             = ( result.army1 & RESULT_RETREAT ) || ( result.army2 & RESULT_RETREAT ) || ( result.army1 & RESULT_SURRENDER ) || ( result.army2 & RESULT_SURRENDER );
         arena.FadeArena( clearMessageLog );
+    }
 
-        // dialog summary
+    // summary dialog
+    if ( isHumanBattle ) {
         if ( isWinnerHuman ) {
             artifactsTransferred = true;
         }
@@ -139,7 +142,7 @@ Battle::Result Battle::Loader( Army & army1, Army & army2, s32 mapsindex )
     // after battle army1
     if ( army1.GetCommander() ) {
         if ( army1.isControlAI() )
-            AI::Get().HeroesAfterBattle( *army1.GetCommander() );
+            AI::Get().HeroesAfterBattle( *army1.GetCommander(), true );
         else
             army1.GetCommander()->ActionAfterBattle();
     }
@@ -147,7 +150,7 @@ Battle::Result Battle::Loader( Army & army1, Army & army2, s32 mapsindex )
     // after battle army2
     if ( army2.GetCommander() ) {
         if ( army2.isControlAI() )
-            AI::Get().HeroesAfterBattle( *army2.GetCommander() );
+            AI::Get().HeroesAfterBattle( *army2.GetCommander(), false );
         else
             army2.GetCommander()->ActionAfterBattle();
     }

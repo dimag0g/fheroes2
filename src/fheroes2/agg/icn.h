@@ -908,7 +908,7 @@ namespace ICN
         BTNGIFT, // not in use anymore
         BTNGIFT_GOOD,
         BTNGIFT_EVIL,
-        BTNMIN,
+        NON_UNIFORM_GOOD_MIN_BUTTON,
         CSLMARKER,
 
         GRAY_FONT,
@@ -916,8 +916,21 @@ namespace ICN
 
         TROLL2MSL,
         LISTBOX_EVIL, // alias to LISTBOX, but black and white colored
+        MONSTER_SWITCH_LEFT_ARROW,
+        MONSTER_SWITCH_RIGHT_ARROW,
 
-        LASTICN, // just a marker, indicating end of the enumeration
+        NON_UNIFORM_GOOD_OKAY_BUTTON,
+        NON_UNIFORM_GOOD_CANCEL_BUTTON,
+        NON_UNIFORM_EVIL_OKAY_BUTTON,
+        NON_UNIFORM_EVIL_CANCEL_BUTTON,
+
+        UNIFORM_GOOD_MAX_BUTTON,
+        UNIFORM_GOOD_MIN_BUTTON,
+        UNIFORM_EVIL_MAX_BUTTON,
+        UNIFORM_EVIL_MIN_BUTTON,
+
+        // IMPORTANT! Put any new entry just above this one.
+        LASTICN
     };
 
     const char * GetString( int );

@@ -205,7 +205,7 @@ namespace
         fheroes2::Blit( fheroes2::AGG::GetICN( icnId, iconIdx ), fheroes2::Display::instance(), offset.x + posX, offset.y + posY );
     }
 
-    void DrawCampaignScenarioIcons( fheroes2::ButtonGroup & buttonGroup, const Campaign::CampaignData campaignData, const fheroes2::Point & top )
+    void DrawCampaignScenarioIcons( fheroes2::ButtonGroup & buttonGroup, const Campaign::CampaignData & campaignData, const fheroes2::Point & top )
     {
         fheroes2::Display & display = fheroes2::Display::instance();
 
@@ -425,6 +425,8 @@ int Game::CompleteCampaignScenario()
     Campaign::CampaignSaveData & saveData = Campaign::CampaignSaveData::Get();
 
     saveData.addCurrentMapToFinished();
+    saveData.addDaysPassed( world.CountDay() );
+
     const int lastCompletedScenarioID = saveData.getLastCompletedScenarioID();
     const Campaign::CampaignData & campaignData = GetCampaignData( saveData.getCampaignID() );
 
@@ -504,7 +506,7 @@ int Game::SelectCampaignScenario()
     for ( uint32_t i = 0; i < bonusChoiceCount; ++i )
         buttonChoices.button( i ).draw();
 
-    Text textDaysSpent( "0", Font::BIG );
+    Text textDaysSpent( std::to_string( campaignSaveData.getDaysPassed() ), Font::BIG );
     textDaysSpent.Blit( top.x + 574 + textDaysSpent.w() / 2, top.y + 31 );
 
     DrawCampaignScenarioDescription( scenario, top );
