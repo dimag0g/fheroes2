@@ -238,13 +238,12 @@ void Battle::Arena::ApplyActionAttack( Command & cmd )
     if ( b1 && b1->isValid() && b2 && b2->isValid() && ( b1->GetCurrentColor() != b2->GetColor() ) ) {
         DEBUG_LOG( DBG_BATTLE, DBG_TRACE, b1->String() << " to " << b2->String() );
 
-        // reset blind
-        if ( b2->Modes( SP_BLIND ) )
-            b2->ResetBlind();
-
         const bool handfighting = Unit::isHandFighting( *b1, *b2 );
         // check position
         if ( b1->isArchers() || handfighting ) {
+            if ( b2->Modes( SP_BLIND ) )
+                b2->SetBlindAnswer( true );
+
             // attack
             BattleProcess( *b1, *b2, dst, dir );
 
@@ -254,6 +253,7 @@ void Battle::Arena::ApplyActionAttack( Command & cmd )
                     BattleProcess( *b2, *b1 );
                     b2->SetResponse();
                 }
+                b2->SetBlindAnswer( false );
 
                 // twice attack
                 if ( b1->isValid() && b1->isTwiceAttack() && !b1->Modes( SP_BLIND | IS_PARALYZE_MAGIC ) ) {
@@ -307,6 +307,10 @@ void Battle::Arena::ApplyActionMove( Command & cmd )
             if ( interface )
                 interface->RedrawActionFly( *b, pos1 );
             pos2 = pos1;
+
+            // check for possible bridge close action, after unit's end of movement
+            if ( bridge && bridge->AllowUp() )
+                bridge->Action( *b, dst );
         }
         else {
             Indexes path;
@@ -820,9 +824,6 @@ void Battle::Arena::ApplyActionTower( Command & cmd )
         target.killed = b2->ApplyDamage( *tower, target.damage );
         if ( interface )
             interface->RedrawActionTowerPart2( *tower, target );
-
-        if ( b2->Modes( SP_BLIND ) )
-            b2->ResetBlind();
     }
     else {
         DEBUG_LOG( DBG_BATTLE, DBG_WARN,

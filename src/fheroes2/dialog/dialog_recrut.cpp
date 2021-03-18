@@ -20,10 +20,11 @@
  *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
  ***************************************************************************/
 
-#include "agg.h"
+#include "agg_image.h"
 #include "cursor.h"
 #include "dialog.h"
 #include "game.h"
+#include "icn.h"
 #include "kingdom.h"
 #include "monster.h"
 #include "payment.h"
@@ -391,13 +392,11 @@ Troop Dialog::RecruitMonster( const Monster & monster0, u32 available, bool ext 
 
         bool skipEventCheck = false;
         if ( le.MousePressRight( monsterArea ) ) {
-            const bool isUpgradedMonster = ext && ( monster != monster.GetDowngrade() );
-            Dialog::ArmyInfo( Troop( isUpgradedMonster ? monster : monster.GetDowngrade(), available ), Dialog::READONLY );
+            Dialog::ArmyInfo( Troop( monster, available ), Dialog::READONLY );
             redraw = true;
         }
         else if ( le.MouseClickLeft( monsterArea ) ) {
-            const bool isUpgradedMonster = ext && ( monster != monster.GetDowngrade() );
-            Dialog::ArmyInfo( Troop( isUpgradedMonster ? monster : monster.GetDowngrade(), available ), Dialog::READONLY | Dialog::BUTTONS );
+            Dialog::ArmyInfo( Troop( monster, available ), Dialog::READONLY | Dialog::BUTTONS );
             redraw = true;
             skipEventCheck = true;
         }

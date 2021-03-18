@@ -72,6 +72,7 @@ LocalEvent::LocalEvent()
     , _isHiddenWindow( false )
     , _isMusicPaused( false )
     , _isSoundPaused( false )
+    , _musicVolume( 0 )
 {}
 
 #if SDL_VERSION_ATLEAST( 2, 0, 0 )
@@ -436,7 +437,7 @@ KeySym GetKeySym( int key )
 
 bool PressIntKey( u32 max, u32 & result )
 {
-    LocalEvent & le = LocalEvent::Get();
+    const LocalEvent & le = LocalEvent::Get();
 
     if ( le.KeyPress( KEY_BACKSPACE ) ) {
         result /= 10;
@@ -1009,26 +1010,7 @@ bool LocalEvent::HandleEvents( bool delay, bool allowExit )
         switch ( event.type ) {
 #if SDL_VERSION_ATLEAST( 2, 0, 0 )
         case SDL_WINDOWEVENT:
-            if ( Mixer::isValid() ) {
-                if ( event.window.event == SDL_WINDOWEVENT_HIDDEN ) {
-                    _isHiddenWindow = true;
-                    _isMusicPaused = Music::isPaused();
-                    _isSoundPaused = Mixer::isPaused( -1 );
-                    Mixer::Pause();
-                    Music::Pause();
-                    loop_delay = 100;
-                }
-                else if ( event.window.event == SDL_WINDOWEVENT_SHOWN ) {
-                    if ( _isHiddenWindow ) {
-                        if ( !_isMusicPaused )
-                            Music::Resume();
-                        if ( !_isSoundPaused )
-                            Mixer::Resume();
-                        _isHiddenWindow = false;
-                    }
-                    loop_delay = 1;
-                }
-            }
+            OnSdl2WindowEvent( event );
             break;
 #else
         case SDL_ACTIVEEVENT:
@@ -1036,22 +1018,10 @@ bool LocalEvent::HandleEvents( bool delay, bool allowExit )
                 if ( Mixer::isValid() ) {
                     // iconify
                     if ( 0 == event.active.gain ) {
-                        _isHiddenWindow = true;
-                        _isMusicPaused = Music::isPaused();
-                        _isSoundPaused = Mixer::isPaused( -1 );
-                        Mixer::Pause();
-                        Music::Pause();
-                        loop_delay = 100;
+                        StopSounds();
                     }
                     else {
-                        if ( _isHiddenWindow ) {
-                            if ( !_isMusicPaused )
-                                Music::Resume();
-                            if ( !_isSoundPaused )
-                                Mixer::Resume();
-                            _isHiddenWindow = false;
-                        }
-                        loop_delay = 1;
+                        ResumeSounds();
                     }
                 }
             }
@@ -1146,8 +1116,45 @@ bool LocalEvent::HandleEvents( bool delay, bool allowExit )
     return true;
 }
 
+void LocalEvent::StopSounds()
+{
+    _isHiddenWindow = true;
+    _isMusicPaused = Music::isPaused();
+    _isSoundPaused = Mixer::isPaused( -1 );
+    Mixer::Pause();
+    Music::Pause();
+    _musicVolume = Music::Volume( 0 );
+    loop_delay = 100;
+}
+
+void LocalEvent::ResumeSounds()
+{
+    if ( _isHiddenWindow ) {
+        Music::Volume( _musicVolume );
+        if ( !_isMusicPaused ) {
+            Music::Resume();
+        }
+        if ( !_isSoundPaused )
+            Mixer::Resume();
+        _isHiddenWindow = false;
+    }
+    loop_delay = 1;
+}
+
 #if SDL_VERSION_ATLEAST( 2, 0, 0 )
-#include "logging.h"
+void LocalEvent::OnSdl2WindowEvent( const SDL_Event & event )
+{
+    if ( !Mixer::isValid() ) {
+        return;
+    }
+    if ( event.window.event == SDL_WINDOWEVENT_FOCUS_LOST ) {
+        StopSounds();
+    }
+    else if ( event.window.event == SDL_WINDOWEVENT_FOCUS_GAINED ) {
+        ResumeSounds();
+    }
+}
+
 void LocalEvent::HandleTouchEvent( const SDL_TouchFingerEvent & event )
 {
     if ( event.touchId != 0 )

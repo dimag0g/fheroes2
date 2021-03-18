@@ -23,6 +23,7 @@
 #include <algorithm>
 
 #include "agg.h"
+#include "agg_image.h"
 #include "audio_mixer.h"
 #include "battle_arena.h"
 #include "battle_bridge.h"
@@ -34,9 +35,9 @@
 #include "battle_troop.h"
 #include "castle.h"
 #include "cursor.h"
-#include "engine.h"
 #include "game.h"
 #include "ground.h"
+#include "icn.h"
 #include "interface_list.h"
 #include "kingdom.h"
 #include "logging.h"
@@ -2215,16 +2216,7 @@ void Battle::Interface::HumanBattleTurn( const Unit & b, Actions & a, std::strin
     // Add offsets to inner objects
     const Rect mainTowerRect = main_tower + _interfacePosition.getPosition();
     const Rect armiesOrderRect = armies_order + _interfacePosition.getPosition();
-    if ( pocket_book.w && le.MouseCursor( pocket_book ) ) {
-        cursor.SetThemes( Cursor::WAR_POINTER );
-        msg = _( "Spell cast" );
-
-        if ( le.MouseClickLeft( pocket_book ) ) {
-            ProcessingHeroDialogResult( 1, a );
-            humanturn_redraw = true;
-        }
-    }
-    else if ( Arena::GetTower( TWR_CENTER ) && le.MouseCursor( mainTowerRect ) ) {
+    if ( Arena::GetTower( TWR_CENTER ) && le.MouseCursor( mainTowerRect ) ) {
         cursor.SetThemes( Cursor::WAR_INFO );
         msg = _( "View Ballista Info" );
 
@@ -3140,6 +3132,13 @@ void Battle::Interface::RedrawActionFly( Unit & unit, const Position & pos )
     // restore
     _movingUnit = NULL;
 
+    // check for possible bridge close action, after unit's end of movement
+    Bridge * bridge = Arena::GetBridge();
+
+    if ( bridge && bridge->AllowUp() ) {
+        bridge->Action( unit, destIndex );
+    }
+
     StringReplace( msg, "%{dst}", unit.GetHeadIndex() );
     status.SetMessage( msg, true );
 }
@@ -3338,36 +3337,103 @@ void Battle::Interface::RedrawActionSpellCastPart2( const Spell & spell, Targets
 {
     if ( spell.isDamage() ) {
         uint32_t killed = 0;
-        uint32_t damage = 0;
+        uint32_t totalDamage = 0;
+        uint32_t maximumDamage = 0;
+        uint32_t damagedMonsters = 0;
 
         for ( TargetsInfo::const_iterator it = targets.begin(); it != targets.end(); ++it ) {
             if ( !it->defender->isModes( CAP_MIRRORIMAGE ) ) {
                 killed += ( *it ).killed;
-                damage += ( *it ).damage;
+
+                ++damagedMonsters;
+                totalDamage += it->damage;
+                if ( maximumDamage < it->damage )
+                    maximumDamage = it->damage;
             }
         }
 
         // targets damage animation
         RedrawActionWincesKills( targets );
 
-        if ( damage ) {
+        if ( totalDamage > 0 ) {
+            assert( damagedMonsters > 0 );
             std::string msg;
-            if ( spell.isUndeadOnly() )
-                msg = _( "The %{spell} spell does %{damage} damage to all undead creatures." );
-            else if ( spell.isALiveOnly() )
-                msg = _( "The %{spell} spell does %{damage} damage to all living creatures." );
-            else
-                msg = _( "The %{spell} does %{damage} damage." );
-            StringReplace( msg, "%{spell}", spell.GetName() );
-            StringReplace( msg, "%{damage}", damage );
+            if ( spell.isUndeadOnly() ) {
+                if ( damagedMonsters == 1 ) {
+                    msg = _( "The %{spell} does %{damage} damage to one undead creature." );
+                    StringReplace( msg, "%{spell}", spell.GetName() );
+                    StringReplace( msg, "%{damage}", totalDamage );
+                    status.SetMessage( msg, true );
 
-            if ( killed ) {
-                status.SetMessage( msg, true );
-                msg = _n( "1 creature perishes.", "%{count} creatures perish.", killed );
-                StringReplace( msg, "%{count}", killed );
+                    if ( killed > 0 ) {
+                        msg = _n( "1 creature perishes.", "%{count} creatures perish.", killed );
+                        StringReplace( msg, "%{count}", killed );
+                        status.SetMessage( msg, true );
+                    }
+                }
+                else {
+                    msg = _( "The %{spell} does %{damage} damage to all undead creatures." );
+                    StringReplace( msg, "%{spell}", spell.GetName() );
+                    StringReplace( msg, "%{damage}", maximumDamage );
+                    status.SetMessage( msg, true );
+
+                    if ( killed > 0 ) {
+                        msg = _( "The %{spell} does %{damage} damage, %{count} creatures perish." );
+                        StringReplace( msg, "%{count}", killed );
+                    }
+                    else {
+                        msg = _( "The %{spell} does %{damage} damage." );
+                    }
+
+                    StringReplace( msg, "%{spell}", spell.GetName() );
+                    StringReplace( msg, "%{damage}", totalDamage );
+                    status.SetMessage( msg, true );
+                }
             }
+            else if ( spell.isALiveOnly() ) {
+                if ( damagedMonsters == 1 ) {
+                    msg = _( "The %{spell} does %{damage} damage to one living creature." );
+                    StringReplace( msg, "%{spell}", spell.GetName() );
+                    StringReplace( msg, "%{damage}", totalDamage );
+                    status.SetMessage( msg, true );
 
-            status.SetMessage( msg, true );
+                    if ( killed > 0 ) {
+                        msg = _n( "1 creature perishes.", "%{count} creatures perish.", killed );
+                        StringReplace( msg, "%{count}", killed );
+                        status.SetMessage( msg, true );
+                    }
+                }
+                else {
+                    msg = _( "The %{spell} does %{damage} damage to all living creatures." );
+                    StringReplace( msg, "%{spell}", spell.GetName() );
+                    StringReplace( msg, "%{damage}", maximumDamage );
+                    status.SetMessage( msg, true );
+
+                    if ( killed > 0 ) {
+                        msg = _( "The %{spell} does %{damage} damage, %{count} creatures perish." );
+                        StringReplace( msg, "%{count}", killed );
+                    }
+                    else {
+                        msg = _( "The %{spell} does %{damage} damage." );
+                    }
+
+                    StringReplace( msg, "%{spell}", spell.GetName() );
+                    StringReplace( msg, "%{damage}", totalDamage );
+                    status.SetMessage( msg, true );
+                }
+            }
+            else {
+                msg = _( "The %{spell} does %{damage} damage." );
+                StringReplace( msg, "%{spell}", spell.GetName() );
+                StringReplace( msg, "%{damage}", totalDamage );
+                status.SetMessage( msg, true );
+
+                if ( killed > 0 ) {
+                    msg = _n( "1 creature perishes.", "%{count} creatures perish.", killed );
+                    StringReplace( msg, "%{count}", killed );
+                    status.SetMessage( msg, true );
+                }
+            }
         }
     }
 
