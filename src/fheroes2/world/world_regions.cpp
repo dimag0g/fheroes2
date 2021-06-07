@@ -139,46 +139,9 @@ MapRegion::MapRegion( int regionIndex, int mapIndex, bool water, size_t expected
     _nodes[0].type = regionIndex;
 }
 
-std::vector<int> MapRegion::getNeighbours() const
-{
-    return std::vector<int>( _neighbours.begin(), _neighbours.end() );
-}
-
 size_t MapRegion::getNeighboursCount() const
 {
     return _neighbours.size();
-}
-
-std::vector<IndexObject> MapRegion::getObjectList() const
-{
-    std::vector<IndexObject> result;
-
-    for ( const MapRegionNode & node : _nodes ) {
-        if ( node.mapObject != 0 ) {
-            result.emplace_back( node.index, node.mapObject );
-        }
-    }
-    return result;
-}
-
-int MapRegion::getObjectCount() const
-{
-    int result = 0;
-    for ( const MapRegionNode & node : _nodes ) {
-        if ( node.mapObject != 0 )
-            ++result;
-    }
-    return result;
-}
-
-double MapRegion::getFogRatio( int color ) const
-{
-    size_t fogCount = 0;
-    for ( const MapRegionNode & node : _nodes ) {
-        if ( world.GetTiles( node.index ).isFog( color ) )
-            ++fogCount;
-    }
-    return static_cast<double>( fogCount ) / _nodes.size();
 }
 
 size_t World::getRegionCount() const
@@ -205,8 +168,6 @@ void World::ComputeStaticAnalysis()
 
     // Step 1. Split map into terrain, water and ground points
     // Initialize the obstacles vector
-    const int width = w();
-    const int height = h();
     TileDataVector obstacles[4];
 
     obstacles[0].reserve( width );
@@ -279,7 +240,7 @@ void World::ComputeStaticAnalysis()
     const size_t totalMapTiles = vec_tiles.size();
     for ( const TileData & castleTile : castleCenters ) {
         // Check if a lot of players next to each other? (Slugfest map)
-        // GetCastle( Point( val % width, val / width ) )->GetColor();
+        // GetCastle( fheroes2::Point( val % width, val / width ) )->GetColor();
         const int castleIndex = castleTile.first + width;
         AppendIfFarEnough( regionCenters, ( castleIndex >= 0 && static_cast<size_t>( castleIndex ) > totalMapTiles ) ? castleTile.first : castleIndex, castleRegionSize );
     }
@@ -302,7 +263,7 @@ void World::ComputeStaticAnalysis()
                         const int newIndex = tileIndex + directionOffsets[direction];
                         if ( newIndex >= 0 && static_cast<size_t>( newIndex ) < totalMapTiles ) {
                             const Maps::Tiles & newTile = vec_tiles[newIndex];
-                            if ( newTile.GetPassable() && tile.isWater() == static_cast<bool>( waterOrGround ) ) {
+                            if ( newTile.GetPassable() != 0 && tile.isWater() == ( waterOrGround != 0 ) ) {
                                 centerIndex = newIndex;
                                 break;
                             }

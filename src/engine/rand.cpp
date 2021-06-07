@@ -21,15 +21,15 @@
  ***************************************************************************/
 
 #include <cstdlib>
-#include <random>
 
 #include "logging.h"
 #include "rand.h"
 
-namespace
+std::mt19937 & Rand::CurrentThreadRandomDevice()
 {
-    std::random_device s_rd;
-    std::mt19937 s_gen( s_rd() );
+    thread_local static std::random_device s_rd;
+    thread_local static std::mt19937 s_gen( s_rd() );
+    return s_gen;
 }
 
 uint32_t Rand::Get( uint32_t from, uint32_t to )
@@ -39,7 +39,7 @@ uint32_t Rand::Get( uint32_t from, uint32_t to )
 
     std::uniform_int_distribution<uint32_t> distrib( from, to );
 
-    return distrib( s_gen );
+    return distrib( CurrentThreadRandomDevice() );
 }
 
 uint32_t Rand::GetWithSeed( uint32_t from, uint32_t to, uint32_t seed )
@@ -51,6 +51,16 @@ uint32_t Rand::GetWithSeed( uint32_t from, uint32_t to, uint32_t seed )
     std::mt19937 seededGen( seed );
 
     return distrib( seededGen );
+}
+
+uint32_t Rand::GetWithGen( uint32_t from, uint32_t to, std::mt19937 & gen )
+{
+    if ( from > to )
+        std::swap( from, to );
+
+    std::uniform_int_distribution<uint32_t> distrib( from, to );
+
+    return distrib( gen );
 }
 
 Rand::Queue::Queue( u32 size )

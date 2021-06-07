@@ -46,18 +46,27 @@ class ActionSimple;
 
 struct ListActions : public std::list<ActionSimple *>
 {
+    ListActions() = default;
+    ListActions( const ListActions & other ) = default;
+    ListActions & operator=( const ListActions & other ) = delete;
+    ListActions( const ListActions && other ) = delete;
+    ListActions & operator=( const ListActions && other ) = delete;
     ~ListActions();
     void clear( void );
 };
 
 struct MapObjects : public std::map<u32, MapObjectSimple *>
 {
+    MapObjects() = default;
+    MapObjects( const MapObjects & other ) = delete;
+    MapObjects & operator=( const MapObjects & other ) = delete;
+    MapObjects( const MapObjects && other ) = delete;
+    MapObjects & operator=( const MapObjects && other ) = delete;
     ~MapObjects();
     void clear( void );
     void add( MapObjectSimple * );
-    std::list<MapObjectSimple *> get( const Point & );
+    std::list<MapObjectSimple *> get( const fheroes2::Point & );
     MapObjectSimple * get( u32 uid );
-    void remove( const Point & );
     void remove( u32 uid );
 };
 
@@ -76,10 +85,6 @@ struct CapturedObject
     int GetSplit( void ) const
     {
         return split;
-    }
-    int GetObject( void ) const
-    {
-        return objcol.first;
     }
     int GetColor( void ) const
     {
@@ -101,11 +106,6 @@ struct CapturedObject
     void SetSplit( int spl )
     {
         split = spl;
-    }
-
-    bool GuardiansProtected( void ) const
-    {
-        return guardians.isValid();
     }
 };
 
@@ -153,33 +153,36 @@ using Rumors = std::list<std::string>;
 using EventsDate = std::list<EventDate>;
 using MapsTiles = std::vector<Maps::Tiles>;
 
-class World : protected Size
+class World : protected fheroes2::Size
 {
 public:
+    World( const World & other ) = delete;
+    World & operator=( const World & other ) = delete;
+    World( const World && other ) = delete;
+    World & operator=( const World && other ) = delete;
     ~World()
     {
         Reset();
     }
 
     bool LoadMapMP2( const std::string & );
-    bool LoadMapMAP( const std::string & );
 
-    void NewMaps( u32, u32 );
+    void NewMaps( int32_t, int32_t );
 
     static World & Get( void );
 
-    s32 w( void ) const
+    int32_t w() const
     {
-        return Size::w;
+        return width;
     }
 
-    s32 h( void ) const
+    int32_t h() const
     {
-        return Size::h;
+        return height;
     }
 
-    const Maps::Tiles & GetTiles( u32, u32 ) const;
-    Maps::Tiles & GetTiles( u32, u32 );
+    const Maps::Tiles & GetTiles( const int32_t x, const int32_t y ) const;
+    Maps::Tiles & GetTiles( const int32_t x, const int32_t y );
     const Maps::Tiles & GetTiles( const int32_t tileId ) const;
     Maps::Tiles & GetTiles( const int32_t tileId );
 
@@ -188,25 +191,28 @@ public:
     Kingdom & GetKingdom( int color );
     const Kingdom & GetKingdom( int color ) const;
 
-    const Castle * GetCastle( const Point & ) const;
-    Castle * GetCastle( const Point & );
+    const Castle * GetCastle( const fheroes2::Point & ) const;
+    Castle * GetCastle( const fheroes2::Point & );
 
     const Heroes * GetHeroes( int /* hero id */ ) const;
     Heroes * GetHeroes( int /* hero id */ );
 
-    const Heroes * GetHeroes( const Point & ) const;
-    Heroes * GetHeroes( const Point & );
+    const Heroes * GetHeroes( const fheroes2::Point & ) const;
+    Heroes * GetHeroes( const fheroes2::Point & );
 
     Heroes * FromJailHeroes( s32 );
     Heroes * GetFreemanHeroes( int race = 0 ) const;
+    Heroes * GetFreemanHeroesSpecial( int heroID ) const;
 
     const Heroes * GetHeroesCondWins( void ) const;
     const Heroes * GetHeroesCondLoss( void ) const;
 
     CastleHeroes GetHeroes( const Castle & ) const;
 
+    void RescanAllHeroesPathPassable() const;
+
     const UltimateArtifact & GetUltimateArtifact( void ) const;
-    bool DiggingForUltimateArtifact( const Point & );
+    bool DiggingForUltimateArtifact( const fheroes2::Point & );
 
     // overall number of cells of the world map: width * height
     size_t getSize() const;
@@ -255,14 +261,14 @@ public:
     void AddEventDate( const EventDate & );
     EventsDate GetEventsDate( int color ) const;
 
-    MapEvent * GetMapEvent( const Point & );
+    MapEvent * GetMapEvent( const fheroes2::Point & );
     MapObjectSimple * GetMapObject( u32 uid );
     void RemoveMapObject( const MapObjectSimple * );
     const MapRegion & getRegion( size_t id ) const;
     size_t getRegionCount() const;
 
     bool isTileBlocked( int toTile, bool fromWater ) const;
-    bool isValidPath( int index, int direction, const int heroColor ) const;
+    bool isValidPath( const int index, const int direction, const int heroColor ) const;
     uint32_t getDistance( const Heroes & hero, int targetIndex );
     std::list<Route::Step> getPath( const Heroes & hero, int targetIndex );
     void resetPathfinder();
@@ -274,7 +280,7 @@ public:
 
 private:
     World()
-        : Size( 0, 0 )
+        : fheroes2::Size( 0, 0 )
         , _rumor( nullptr )
     {}
 
@@ -289,9 +295,6 @@ private:
     friend class Radar;
     friend StreamBase & operator<<( StreamBase &, const World & );
     friend StreamBase & operator>>( StreamBase &, World & );
-#ifdef WITH_XML
-    friend TiXmlElement & operator>>( TiXmlElement &, World & );
-#endif
 
     MapsTiles vec_tiles;
     AllHeroes vec_heroes;

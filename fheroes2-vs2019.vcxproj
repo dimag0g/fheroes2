@@ -38,6 +38,7 @@
     <ProjectGuid>{DD8F214C-C405-4951-8F98-66B969BA8E08}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>fheroes2</RootNamespace>
+    <TargetName>fheroes2</TargetName>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -185,7 +186,6 @@
     <ClCompile Include="src\engine\logging.cpp" />
     <ClCompile Include="src\engine\pal.cpp" />
     <ClCompile Include="src\engine\rand.cpp" />
-    <ClCompile Include="src\engine\rect.cpp" />
     <ClCompile Include="src\engine\screen.cpp" />
     <ClCompile Include="src\engine\sdlnet.cpp" />
     <ClCompile Include="src\engine\serialize.cpp" />
@@ -246,6 +246,7 @@
     <ClCompile Include="src\fheroes2\castle\castle_mageguild.cpp" />
     <ClCompile Include="src\fheroes2\castle\castle_tavern.cpp" />
     <ClCompile Include="src\fheroes2\castle\castle_town.cpp" />
+    <ClCompile Include="src\fheroes2\castle\castle_ui.cpp" />
     <ClCompile Include="src\fheroes2\castle\castle_well.cpp" />
     <ClCompile Include="src\fheroes2\castle\mageguild.cpp" />
     <ClCompile Include="src\fheroes2\dialog\dialog_adventure.cpp" />
@@ -287,7 +288,9 @@
     <ClCompile Include="src\fheroes2\game\game_interface.cpp" />
     <ClCompile Include="src\fheroes2\game\game_io.cpp" />
     <ClCompile Include="src\fheroes2\game\game_loadgame.cpp" />
+    <ClCompile Include="src\fheroes2\game\game_logo.cpp" />
     <ClCompile Include="src\fheroes2\game\game_mainmenu.cpp" />
+    <ClCompile Include="src\fheroes2\game\game_mainmenu_ui.cpp" />
     <ClCompile Include="src\fheroes2\game\game_newgame.cpp" />
     <ClCompile Include="src\fheroes2\game\game_over.cpp" />
     <ClCompile Include="src\fheroes2\game\game_scenarioinfo.cpp" />
@@ -362,7 +365,6 @@
     <ClCompile Include="src\fheroes2\objects\trees.cpp" />
     <ClCompile Include="src\fheroes2\resource\artifact.cpp" />
     <ClCompile Include="src\fheroes2\resource\artifact_ultimate.cpp" />
-    <ClCompile Include="src\fheroes2\resource\maps_text.cpp" />
     <ClCompile Include="src\fheroes2\resource\resource.cpp" />
     <ClCompile Include="src\fheroes2\spell\spell.cpp" />
     <ClCompile Include="src\fheroes2\spell\spell_book.cpp" />
@@ -396,7 +398,6 @@
     <ClInclude Include="src\engine\palette_h2.h" />
     <ClInclude Include="src\engine\pathfinding.h" />
     <ClInclude Include="src\engine\rand.h" />
-    <ClInclude Include="src\engine\rect.h" />
     <ClInclude Include="src\engine\screen.h" />
     <ClInclude Include="src\engine\sdlnet.h" />
     <ClInclude Include="src\engine\serialize.h" />
@@ -444,6 +445,7 @@
     <ClInclude Include="src\fheroes2\castle\captain.h" />
     <ClInclude Include="src\fheroes2\castle\castle.h" />
     <ClInclude Include="src\fheroes2\castle\castle_heroes.h" />
+    <ClInclude Include="src\fheroes2\castle\castle_ui.h" />
     <ClInclude Include="src\fheroes2\castle\mageguild.h" />
     <ClInclude Include="src\fheroes2\dialog\dialog.h" />
     <ClInclude Include="src\fheroes2\dialog\dialog_resolution.h" />
@@ -455,9 +457,13 @@
     <ClInclude Include="src\fheroes2\game\game_delays.h" />
     <ClInclude Include="src\fheroes2\game\game_interface.h" />
     <ClInclude Include="src\fheroes2\game\game_io.h" />
+    <ClInclude Include="src\fheroes2\game\game_logo.h" />
+    <ClInclude Include="src\fheroes2\game\game_mainmenu_ui.h" />
+    <ClInclude Include="src\fheroes2\game\game_mode.h" />
     <ClInclude Include="src\fheroes2\game\game_over.h" />
     <ClInclude Include="src\fheroes2\game\game_static.h" />
     <ClInclude Include="src\fheroes2\game\game_video.h" />
+    <ClInclude Include="src\fheroes2\game\game_video_type.h" />
     <ClInclude Include="src\fheroes2\gui\cursor.h" />
     <ClInclude Include="src\fheroes2\gui\interface_border.h" />
     <ClInclude Include="src\fheroes2\gui\interface_buttons.h" />

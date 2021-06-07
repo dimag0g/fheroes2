@@ -24,6 +24,7 @@
 #define H2BATTLE_BOARD_H
 
 #include <functional>
+#include <random>
 
 #include "battle.h"
 #include "battle_cell.h"
@@ -52,19 +53,17 @@ namespace Battle
 
         void Reset( void );
 
-        Rect GetArea( void ) const;
-        void SetArea( const Rect & );
+        void SetArea( const fheroes2::Rect & );
 
-        s32 GetIndexAbsPosition( const Point & ) const;
-        Indexes GetPassableQualityPositions( const Unit & b );
+        s32 GetIndexAbsPosition( const fheroes2::Point & ) const;
         std::vector<Unit *> GetNearestTroops( const Unit * startUnit, const std::vector<Unit *> & blackList );
         Indexes GetAStarPath( const Unit & unit, const Position & destination, const bool debug = true ) const;
 
-        void SetEnemyQuality( const Unit & );
-        void SetPositionQuality( const Unit & );
+        void SetEnemyQuality( const Unit & ) const;
+        void SetPositionQuality( const Unit & ) const;
         void SetScanPassability( const Unit & );
 
-        void SetCobjObjects( const Maps::Tiles & );
+        void SetCobjObjects( const Maps::Tiles & tile, std::mt19937 & gen );
         void SetCovrObjects( int icn );
 
         static std::string GetMoatInfo( void );
@@ -73,13 +72,14 @@ namespace Battle
         static bool isNearIndexes( s32, s32 );
         static bool isValidIndex( s32 );
         static bool isCastleIndex( s32 );
-        static bool isMoatIndex( s32, int );
-        static bool isBridgeIndex( s32, int );
+        static bool isMoatIndex( s32 index, const Unit & b );
+        static bool isBridgeIndex( s32 index, const Unit & b );
         static bool isImpassableIndex( s32 );
         static bool isOutOfWallsIndex( s32 );
         static bool isReflectDirection( int );
         static bool IsLeftDirection( const int32_t startCellId, const int32_t endCellId, const bool prevLeftDirection );
         static bool isNegativeDistance( s32 index1, s32 index2 );
+        static int DistanceFromOriginX( int32_t index, bool reflect );
         static int GetReflectDirection( int );
         static int GetDirection( s32, s32 );
         static int32_t DoubleCellAttackValue( const Unit & attacker, const Unit & target, const int32_t from, const int32_t targetCell );

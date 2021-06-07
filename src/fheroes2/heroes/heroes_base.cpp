@@ -350,12 +350,6 @@ int HeroBase::GetMoraleModificator( std::string * strs ) const
         result += castle->GetMoraleModificator( strs );
 
     // army modificator
-    if ( GetArmy().AllTroopsIsRace( Race::NECR ) ) {
-        if ( strs )
-            strs->clear();
-        result = 0;
-    }
-
     result += GetArmy().GetMoraleModificator( strs );
 
     return result;
@@ -375,6 +369,15 @@ int HeroBase::GetLuckModificator( std::string * strs ) const
     result += GetArmy().GetLuckModificator( strs );
 
     return result;
+}
+
+double HeroBase::GetSpellcastStrength() const
+{
+    if ( GetSpells().empty() )
+        return 0.0;
+
+    // Benchmark for strength is 20 power * 20 knowledge (200 spell points) is 3000.0
+    return GetPower() * sqrt( GetSpellPoints() / 2 ) * 15.0;
 }
 
 bool HeroBase::CanCastSpell( const Spell & spell, std::string * res ) const
@@ -497,11 +500,6 @@ StreamBase & operator>>( StreamBase & msg, HeroBase & hero )
     msg >> static_cast<Skill::Primary &>( hero ) >> static_cast<MapPosition &>( hero ) >>
         // modes
         hero.modes >> hero.magic_point >> hero.move_point >> hero.spell_book >> hero.bag_artifacts;
-
-    if ( FORMAT_VERSION_070_RELEASE > Game::GetLoadVersion() ) {
-        if ( hero.bag_artifacts.size() < HEROESMAXARTIFACT )
-            hero.bag_artifacts.resize( HEROESMAXARTIFACT, Artifact::UNKNOWN );
-    }
 
     return msg;
 }

@@ -146,6 +146,7 @@ public:
     bool isUndeadOnly( void ) const;
     bool isALiveOnly( void ) const;
     bool isSummon( void ) const;
+    bool isEffectDispel() const;
     bool isApplyWithoutFocusObject( void ) const;
     bool isApplyToAnyTroops( void ) const;
     bool isApplyToFriends( void ) const;
@@ -163,7 +164,6 @@ public:
     static Spell RandAdventure( int lvl );
     static Spell Rand( int lvl, bool adv );
 
-    static void UpdateStats( const std::string & );
     static u32 CalculateDimensionDoorDistance( u32 current_sp, u32 total_hp );
 
 private:

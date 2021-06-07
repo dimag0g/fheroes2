@@ -27,6 +27,7 @@
 #include <string>
 #include <vector>
 
+#include "game_mode.h"
 #include "gamedefs.h"
 #include "image.h"
 
@@ -34,6 +35,7 @@
 #define BOXAREA_WIDTH 244
 
 class Castle;
+class Kingdom;
 class Heroes;
 class Artifact;
 class Spell;
@@ -79,7 +81,7 @@ namespace Dialog
     };
 
     int AdventureOptions( bool enabledig );
-    int FileOptions( void );
+    fheroes2::GameMode FileOptions();
     int SystemOptions( void );
     std::string SelectFileLoad( void );
     std::string SelectFileSave( void );
@@ -101,7 +103,7 @@ namespace Dialog
     int ResourceInfo( const std::string &, const std::string &, const Funds &, int buttons = Dialog::OK );
     int SelectSkillFromArena( void );
     bool SelectCount( const std::string &, u32 min, u32 max, u32 & res, int step = 1 );
-    bool InputString( const std::string &, std::string & );
+    bool InputString( const std::string &, std::string &, const std::string & title = std::string() );
     Troop RecruitMonster( const Monster &, u32 available, bool );
     void DwellingInfo( const Monster &, u32 available );
     bool SetGuardian( Heroes &, Troop &, CapturedObject &, bool readonly );
@@ -109,8 +111,8 @@ namespace Dialog
     int ArmyJoinFree( const Troop &, Heroes & );
     int ArmyJoinWithCost( const Troop &, u32 join, u32 gold, Heroes & );
     int ArmySplitTroop( const uint32_t freeSlots, const uint32_t redistributeMax, const bool saveLastTroop, uint32_t & redistributeCount, bool & useFastSplit );
-    void Marketplace( bool fromTradingPost = false );
-    void MakeGiftResource( void );
+    void Marketplace( Kingdom & kingdom, bool fromTradingPost );
+    void MakeGiftResource( Kingdom & kingdom );
     int BuyBoat( bool enable );
     void ThievesGuild( bool oracle );
     void GameInfo( void );
@@ -142,37 +144,35 @@ namespace Dialog
     {
     public:
         FrameBox( int height, bool buttons = false );
-        virtual ~FrameBox();
+        ~FrameBox() override = default;
     };
 
     class FrameBorder
     {
     public:
-        FrameBorder( int v = BORDERWIDTH );
-        FrameBorder( const fheroes2::Size & );
+        explicit FrameBorder( int v = BORDERWIDTH );
+        explicit FrameBorder( const fheroes2::Size & );
         FrameBorder( const fheroes2::Size &, const fheroes2::Image & );
-        FrameBorder( s32, s32, u32, u32 );
-        ~FrameBorder();
 
         int BorderWidth() const;
         int BorderHeight() const;
         void SetPosition( int32_t posx, int32_t posy, uint32_t encw, uint32_t ench );
 
         bool isValid() const;
-        const Rect & GetRect() const;
-        const Rect & GetArea() const;
-        const Rect & GetTop() const;
+        const fheroes2::Rect & GetRect() const;
+        const fheroes2::Rect & GetArea() const;
+        const fheroes2::Rect & GetTop() const;
 
-        static void RenderRegular( const Rect & dstrt );
+        static void RenderRegular( const fheroes2::Rect & dstrt );
         static void RenderOther( const fheroes2::Image &, const fheroes2::Rect & );
 
     protected:
         fheroes2::ImageRestorer restorer;
 
     private:
-        Rect rect;
-        Rect area;
-        Rect top;
+        fheroes2::Rect rect;
+        fheroes2::Rect area;
+        fheroes2::Rect top;
         int border;
     };
 }

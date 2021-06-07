@@ -25,37 +25,35 @@
 
 #include "agg.h"
 #include "agg_image.h"
+#include "cursor.h"
 #include "game.h"
+#include "game_delays.h"
 #include "game_interface.h"
 #include "icn.h"
 #include "logging.h"
 #include "mus.h"
 #include "puzzle.h"
+#include "rand.h"
 #include "ui_window.h"
 #include "world.h"
 
-const u8 zone1_index[] = {0, 1, 2, 3, 4, 5, 6, 11, 12, 17, 18, 23, 24, 29, 30, 35, 36, 41, 42, 43, 44, 45, 46, 47};
-const u8 zone2_index[] = {7, 8, 9, 10, 13, 16, 19, 22, 25, 28, 31, 34, 37, 38, 39, 40};
-const u8 zone3_index[] = {14, 15, 32, 33};
-const u8 zone4_index[] = {20, 21, 26, 27};
-
-bool ClosedTilesExists( const Puzzle &, const u8 *, const u8 * );
-void ZoneOpenFirstTiles( Puzzle &, u32 &, const u8 *, const u8 * );
+bool ClosedTilesExists( const Puzzle &, const std::vector<uint8_t> & );
+void ZoneOpenFirstTiles( Puzzle &, size_t &, const std::vector<uint8_t> & );
 void ShowStandardDialog( const Puzzle &, const fheroes2::Image & );
 void ShowExtendedDialog( const Puzzle &, const fheroes2::Image & );
 void PuzzlesDraw( const Puzzle &, const fheroes2::Image &, s32, s32 );
 
 Puzzle::Puzzle()
 {
-    std::copy( zone1_index, zone1_index + ARRAY_COUNT( zone1_index ), zone1_order );
-    std::copy( zone2_index, zone2_index + ARRAY_COUNT( zone2_index ), zone2_order );
-    std::copy( zone3_index, zone3_index + ARRAY_COUNT( zone3_index ), zone3_order );
-    std::copy( zone4_index, zone4_index + ARRAY_COUNT( zone4_index ), zone4_order );
+    zone1_order = { 0, 1, 2, 3, 4, 5, 6, 11, 12, 17, 18, 23, 24, 29, 30, 35, 36, 41, 42, 43, 44, 45, 46, 47 };
+    zone2_order = { 7, 8, 9, 10, 13, 16, 19, 22, 25, 28, 31, 34, 37, 38, 39, 40 };
+    zone3_order = { 14, 15, 32, 33 };
+    zone4_order = { 20, 21, 26, 27 };
 
-    std::random_shuffle( zone1_order, zone1_order + ARRAY_COUNT( zone1_order ) );
-    std::random_shuffle( zone2_order, zone2_order + ARRAY_COUNT( zone2_order ) );
-    std::random_shuffle( zone3_order, zone3_order + ARRAY_COUNT( zone3_order ) );
-    std::random_shuffle( zone4_order, zone4_order + ARRAY_COUNT( zone4_order ) );
+    Rand::Shuffle( zone1_order );
+    Rand::Shuffle( zone2_order );
+    Rand::Shuffle( zone3_order );
+    Rand::Shuffle( zone4_order );
 }
 
 Puzzle & Puzzle::operator=( const char * str )
@@ -72,63 +70,58 @@ Puzzle & Puzzle::operator=( const char * str )
 
 void Puzzle::Update( u32 open_obelisk, u32 total_obelisk )
 {
-    u32 open_puzzle = open_obelisk * PUZZLETILES / total_obelisk;
-    u32 need_puzzle = open_puzzle > count() ? open_puzzle - count() : 0;
+    const uint32_t open_puzzle = open_obelisk * PUZZLETILES / total_obelisk;
+    size_t need_puzzle = open_puzzle > count() ? open_puzzle - count() : 0;
 
-    if ( need_puzzle && ClosedTilesExists( *this, zone1_order, ARRAY_COUNT_END( zone1_order ) ) )
-        ZoneOpenFirstTiles( *this, need_puzzle, zone1_order, ARRAY_COUNT_END( zone1_order ) );
+    if ( need_puzzle && ClosedTilesExists( *this, zone1_order ) )
+        ZoneOpenFirstTiles( *this, need_puzzle, zone1_order );
 
-    if ( need_puzzle && ClosedTilesExists( *this, zone2_order, ARRAY_COUNT_END( zone2_order ) ) )
-        ZoneOpenFirstTiles( *this, need_puzzle, zone2_order, ARRAY_COUNT_END( zone2_order ) );
+    if ( need_puzzle && ClosedTilesExists( *this, zone2_order ) )
+        ZoneOpenFirstTiles( *this, need_puzzle, zone2_order );
 
-    if ( need_puzzle && ClosedTilesExists( *this, zone3_order, ARRAY_COUNT_END( zone3_order ) ) )
-        ZoneOpenFirstTiles( *this, need_puzzle, zone3_order, ARRAY_COUNT_END( zone3_order ) );
+    if ( need_puzzle && ClosedTilesExists( *this, zone3_order ) )
+        ZoneOpenFirstTiles( *this, need_puzzle, zone3_order );
 
-    if ( need_puzzle && ClosedTilesExists( *this, zone4_order, ARRAY_COUNT_END( zone4_order ) ) )
-        ZoneOpenFirstTiles( *this, need_puzzle, zone4_order, ARRAY_COUNT_END( zone4_order ) );
+    if ( need_puzzle && ClosedTilesExists( *this, zone4_order ) )
+        ZoneOpenFirstTiles( *this, need_puzzle, zone4_order );
 }
 
 void Puzzle::ShowMapsDialog( void ) const
 {
-    Cursor & cursor = Cursor::Get();
-    const fheroes2::Display & display = fheroes2::Display::instance();
-    int old_cursor = cursor.Themes();
-
-    if ( !Settings::Get().MusicMIDI() )
-        AGG::PlayMusic( MUS::PUZZLE );
-
     const fheroes2::Image & sf = world.GetUltimateArtifact().GetPuzzleMapSurface();
+    if ( sf.empty() )
+        return;
 
-    if ( !sf.empty() ) {
-        cursor.Hide();
+    const fheroes2::Display & display = fheroes2::Display::instance();
 
-        AGG::PlayMusic( MUS::PUZZLE, false );
+    // setup cursor
+    const CursorRestorer cursorRestorer( true, Cursor::POINTER );
 
-        if ( display.isDefaultSize() && !Settings::Get().ExtGameHideInterface() )
-            ShowStandardDialog( *this, sf );
-        else
-            ShowExtendedDialog( *this, sf );
+    AGG::PlayMusic( MUS::PUZZLE, false );
 
-        cursor.SetThemes( old_cursor );
-    }
+    if ( display.isDefaultSize() && !Settings::Get().ExtGameHideInterface() )
+        ShowStandardDialog( *this, sf );
+    else
+        ShowExtendedDialog( *this, sf );
 }
 
-bool ClosedTilesExists( const Puzzle & pzl, const u8 * it1, const u8 * it2 )
+bool ClosedTilesExists( const Puzzle & pzl, const std::vector<uint8_t> & zone )
 {
-    while ( it1 < it2 )
-        if ( !pzl.test( *it1++ ) )
+    for ( const uint8_t tile : zone ) {
+        if ( !pzl.test( tile ) )
             return true;
+    }
     return false;
 }
 
-void ZoneOpenFirstTiles( Puzzle & pzl, u32 & opens, const u8 * it1, const u8 * it2 )
+void ZoneOpenFirstTiles( Puzzle & pzl, size_t & opens, const std::vector<uint8_t> & zone )
 {
     while ( opens ) {
-        const u8 * it = it1;
-        while ( it < it2 && pzl.test( *it ) )
+        std::vector<uint8_t>::const_iterator it = zone.begin();
+        while ( it != zone.end() && pzl.test( *it ) )
             ++it;
 
-        if ( it != it2 ) {
+        if ( it != zone.end() ) {
             pzl.set( *it );
             --opens;
         }
@@ -140,10 +133,9 @@ void ZoneOpenFirstTiles( Puzzle & pzl, u32 & opens, const u8 * it1, const u8 * i
 void ShowStandardDialog( const Puzzle & pzl, const fheroes2::Image & sf )
 {
     fheroes2::Display & display = fheroes2::Display::instance();
-    Cursor & cursor = Cursor::Get();
 
     const Interface::Radar & radar = Interface::Basic::Get().GetRadar();
-    const Rect & radarPos = radar.GetArea();
+    const fheroes2::Rect & radarPos = radar.GetArea();
     const bool isEvilInterface = Settings::Get().ExtGameEvilInterface();
 
     fheroes2::ImageRestorer back( display, BORDERWIDTH, BORDERWIDTH, sf.width(), sf.height() );
@@ -151,15 +143,14 @@ void ShowStandardDialog( const Puzzle & pzl, const fheroes2::Image & sf )
     fheroes2::Blit( fheroes2::AGG::GetICN( ( isEvilInterface ? ICN::EVIWPUZL : ICN::VIEWPUZL ), 0 ), display, radarPos.x, radarPos.y );
     fheroes2::Blit( sf, display, BORDERWIDTH, BORDERWIDTH );
 
-    Point dst_pt( radarPos.x + 32, radarPos.y + radarPos.h - 37 );
+    fheroes2::Point dst_pt( radarPos.x + 32, radarPos.y + radarPos.height - 37 );
     fheroes2::Button buttonExit( dst_pt.x, dst_pt.y, ( isEvilInterface ? ICN::LGNDXTRE : ICN::LGNDXTRA ), 4, 5 );
 
     buttonExit.draw();
     PuzzlesDraw( pzl, sf, BORDERWIDTH, BORDERWIDTH );
 
-    cursor.SetThemes( Cursor::POINTER );
-    cursor.Show();
     display.render();
+
     LocalEvent & le = LocalEvent::Get();
 
     while ( le.HandleEvents() ) {
@@ -169,24 +160,23 @@ void ShowStandardDialog( const Puzzle & pzl, const fheroes2::Image & sf )
     }
 
     radar.SetRedraw();
-
-    cursor.Hide();
 }
 
 void ShowExtendedDialog( const Puzzle & pzl, const fheroes2::Image & sf )
 {
     fheroes2::Display & display = fheroes2::Display::instance();
-    Cursor & cursor = Cursor::Get();
-    const Settings & conf = Settings::Get();
-    const Rect & gameArea = Interface::Basic::Get().GetGameArea().GetROI();
 
-    const fheroes2::StandardWindow border( gameArea.x + ( gameArea.w - sf.width() - BORDERWIDTH * 2 ) / 2,
-                                           gameArea.y + ( gameArea.h - sf.height() - BORDERWIDTH * 2 ) / 2, sf.width(), sf.height() );
+    const fheroes2::Rect & gameArea = Interface::Basic::Get().GetGameArea().GetROI();
 
-    Rect blitArea = border.activeArea();
+    const fheroes2::StandardWindow border( gameArea.x + ( gameArea.width - sf.width() - BORDERWIDTH * 2 ) / 2,
+                                           gameArea.y + ( gameArea.height - sf.height() - BORDERWIDTH * 2 ) / 2, sf.width(), sf.height() );
 
-    fheroes2::Image background( blitArea.w, blitArea.h );
-    if ( conf.ExtGameEvilInterface() )
+    fheroes2::Rect blitArea = border.activeArea();
+
+    fheroes2::Image background( blitArea.width, blitArea.height );
+
+    const bool isEvilInterface = Settings::Get().ExtGameEvilInterface();
+    if ( isEvilInterface )
         background.fill( fheroes2::GetColorId( 80, 80, 80 ) );
     else
         background.fill( fheroes2::GetColorId( 128, 64, 32 ) );
@@ -195,20 +185,18 @@ void ShowExtendedDialog( const Puzzle & pzl, const fheroes2::Image & sf )
     fheroes2::Blit( sf, display, blitArea.x, blitArea.y );
 
     const Interface::Radar & radar = Interface::Basic::Get().GetRadar();
-    const Rect & radarPos = radar.GetArea();
-    const bool isEvilInterface = Settings::Get().ExtGameEvilInterface();
+    const fheroes2::Rect & radarPos = radar.GetArea();
 
     fheroes2::Blit( fheroes2::AGG::GetICN( ( isEvilInterface ? ICN::EVIWPUZL : ICN::VIEWPUZL ), 0 ), display, radarPos.x, radarPos.y );
 
-    Point dst_pt( radarPos.x + 32, radarPos.y + radarPos.h - 37 );
+    fheroes2::Point dst_pt( radarPos.x + 32, radarPos.y + radarPos.height - 37 );
     fheroes2::Button buttonExit( dst_pt.x, dst_pt.y, ( isEvilInterface ? ICN::LGNDXTRE : ICN::LGNDXTRA ), 4, 5 );
 
     buttonExit.draw();
     PuzzlesDraw( pzl, sf, blitArea.x, blitArea.y );
 
-    cursor.SetThemes( Cursor::POINTER );
-    cursor.Show();
     display.render();
+
     LocalEvent & le = LocalEvent::Get();
 
     while ( le.HandleEvents() ) {
@@ -223,7 +211,6 @@ void ShowExtendedDialog( const Puzzle & pzl, const fheroes2::Image & sf )
 void PuzzlesDraw( const Puzzle & pzl, const fheroes2::Image & sf, s32 dstx, s32 dsty )
 {
     fheroes2::Display & display = fheroes2::Display::instance();
-    Cursor & cursor = Cursor::Get();
 
     // show all for debug
     if ( IS_DEVEL() )
@@ -232,25 +219,31 @@ void PuzzlesDraw( const Puzzle & pzl, const fheroes2::Image & sf, s32 dstx, s32 
     int alpha = 250;
     LocalEvent & le = LocalEvent::Get();
 
-    while ( le.HandleEvents() && 0 <= alpha ) {
-        if ( Game::AnimateInfrequentDelay( Game::PUZZLE_FADE_DELAY ) ) {
-            cursor.Hide();
+    const std::vector<Game::DelayType> delayTypes = { Game::PUZZLE_FADE_DELAY };
+    Game::passAnimationDelay( Game::PUZZLE_FADE_DELAY );
+
+    while ( alpha >= 0 && le.HandleEvents( Game::isDelayNeeded( delayTypes ) ) ) {
+        if ( Game::validateAnimationDelay( Game::PUZZLE_FADE_DELAY ) ) {
             fheroes2::Blit( sf, display, dstx, dsty );
             for ( size_t i = 0; i < pzl.size(); ++i ) {
                 const fheroes2::Sprite & piece = fheroes2::AGG::GetICN( ICN::PUZZLE, static_cast<uint32_t>( i ) );
 
-                int pieceAlpha = 255;
+                uint8_t pieceAlpha = 255;
                 if ( pzl.test( i ) )
-                    pieceAlpha = alpha;
+                    pieceAlpha = static_cast<uint8_t>( alpha );
 
-                fheroes2::AlphaBlit( piece, display, dstx + piece.x() - BORDERWIDTH, dsty + piece.y() - BORDERWIDTH, static_cast<uint8_t>( pieceAlpha ) );
+                fheroes2::AlphaBlit( piece, display, dstx + piece.x() - BORDERWIDTH, dsty + piece.y() - BORDERWIDTH, pieceAlpha );
             }
-            cursor.Show();
-            display.render();
+            display.render( fheroes2::Rect( dstx, dsty, sf.width(), sf.height() ) );
+
+            if ( alpha <= 0 ) {
+                break;
+            }
+
             alpha -= 10;
+            assert( alpha >= 0 );
         }
     }
-    cursor.Hide();
 }
 
 StreamBase & operator<<( StreamBase & msg, const Puzzle & pzl )
@@ -258,21 +251,21 @@ StreamBase & operator<<( StreamBase & msg, const Puzzle & pzl )
     msg << pzl.to_string<char, std::char_traits<char>, std::allocator<char> >();
 
     // orders
-    msg << static_cast<u8>( ARRAY_COUNT( pzl.zone1_order ) );
-    for ( u32 ii = 0; ii < ARRAY_COUNT( pzl.zone1_order ); ++ii )
-        msg << pzl.zone1_order[ii];
+    msg << static_cast<uint8_t>( pzl.zone1_order.size() );
+    for ( const uint8_t tile : pzl.zone1_order )
+        msg << tile;
 
-    msg << static_cast<u8>( ARRAY_COUNT( pzl.zone2_order ) );
-    for ( u32 ii = 0; ii < ARRAY_COUNT( pzl.zone2_order ); ++ii )
-        msg << pzl.zone2_order[ii];
+    msg << static_cast<uint8_t>( pzl.zone2_order.size() );
+    for ( const uint8_t tile : pzl.zone2_order )
+        msg << tile;
 
-    msg << static_cast<u8>( ARRAY_COUNT( pzl.zone3_order ) );
-    for ( u32 ii = 0; ii < ARRAY_COUNT( pzl.zone3_order ); ++ii )
-        msg << pzl.zone3_order[ii];
+    msg << static_cast<uint8_t>( pzl.zone3_order.size() );
+    for ( const uint8_t tile : pzl.zone3_order )
+        msg << tile;
 
-    msg << static_cast<u8>( ARRAY_COUNT( pzl.zone4_order ) );
-    for ( u32 ii = 0; ii < ARRAY_COUNT( pzl.zone4_order ); ++ii )
-        msg << pzl.zone4_order[ii];
+    msg << static_cast<uint8_t>( pzl.zone4_order.size() );
+    for ( const uint8_t tile : pzl.zone4_order )
+        msg << tile;
 
     return msg;
 }
@@ -284,22 +277,26 @@ StreamBase & operator>>( StreamBase & msg, Puzzle & pzl )
     msg >> str;
     pzl = str.c_str();
 
-    u8 size;
+    uint8_t size;
 
     msg >> size;
-    for ( u32 ii = 0; ii < size; ++ii )
+    pzl.zone1_order.resize( size );
+    for ( uint8_t ii = 0; ii < size; ++ii )
         msg >> pzl.zone1_order[ii];
 
     msg >> size;
-    for ( u32 ii = 0; ii < size; ++ii )
+    pzl.zone2_order.resize( size );
+    for ( uint8_t ii = 0; ii < size; ++ii )
         msg >> pzl.zone2_order[ii];
 
     msg >> size;
-    for ( u32 ii = 0; ii < size; ++ii )
+    pzl.zone3_order.resize( size );
+    for ( uint8_t ii = 0; ii < size; ++ii )
         msg >> pzl.zone3_order[ii];
 
     msg >> size;
-    for ( u32 ii = 0; ii < size; ++ii )
+    pzl.zone4_order.resize( size );
+    for ( uint8_t ii = 0; ii < size; ++ii )
         msg >> pzl.zone4_order[ii];
 
     return msg;

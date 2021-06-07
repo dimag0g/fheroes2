@@ -34,6 +34,7 @@
 #include "difficulty.h"
 #include "game.h"
 #include "game_credits.h"
+#include "game_delays.h"
 #include "game_interface.h"
 #include "game_static.h"
 #include "icn.h"
@@ -60,8 +61,6 @@ namespace Game
     u32 GetMixerChannelFromObject( const Maps::Tiles & );
     void AnimateDelaysInitialize( void );
     void KeyboardGlobalFilter( int, int );
-    void UpdateGlobalDefines( const std::string & );
-    void LoadExternalResource();
 
     void HotKeysDefaults( void );
     void HotKeysLoad( const std::string & );
@@ -78,7 +77,7 @@ namespace Game
 
     namespace ObjectFadeAnimation
     {
-        FadeTask::FadeTask( uint8_t object_, uint32_t objectIndex_, uint32_t animationIndex_, uint32_t fromIndex_, uint32_t toIndex_, uint32_t alpha_, bool fadeOut_,
+        FadeTask::FadeTask( int object_, uint32_t objectIndex_, uint32_t animationIndex_, int32_t fromIndex_, int32_t toIndex_, uint8_t alpha_, bool fadeOut_,
                             bool fadeIn_, uint8_t objectTileset_ )
             : object( object_ )
             , objectIndex( objectIndex_ )
@@ -112,7 +111,9 @@ namespace Game
 // Returns the difficulty level based on the type of game.
 int Game::getDifficulty()
 {
-    return ( ( Settings::Get().GameType() & Game::TYPE_CAMPAIGN ) != 0 ) ? Difficulty::NORMAL : Settings::Get().GameDifficulty();
+    Settings & configuration = Settings::Get();
+
+    return ( configuration.isCampaignGameType() ? configuration.CurrentFileInfo().difficulty : configuration.GameDifficulty() );
 }
 
 void Game::LoadPlayers( const std::string & mapFileName, Players & players )
@@ -121,8 +122,8 @@ void Game::LoadPlayers( const std::string & mapFileName, Players & players )
         return;
     }
 
-    const int newHumanCount = std::count_if( players.begin(), players.end(), []( const Player * player ) { return player->GetControl() == CONTROL_HUMAN; } );
-    const int savedHumanCount = std::count_if( savedPlayers.begin(), savedPlayers.end(), []( const Player & player ) { return player.GetControl() == CONTROL_HUMAN; } );
+    const auto newHumanCount = std::count_if( players.begin(), players.end(), []( const Player * player ) { return player->GetControl() == CONTROL_HUMAN; } );
+    const auto savedHumanCount = std::count_if( savedPlayers.begin(), savedPlayers.end(), []( const Player & player ) { return player.GetControl() == CONTROL_HUMAN; } );
 
     if ( newHumanCount != savedHumanCount ) {
         return;
@@ -134,6 +135,7 @@ void Game::LoadPlayers( const std::string & mapFileName, Players & players )
         player->SetRace( p.GetRace() );
         player->SetControl( p.GetControl() );
         player->SetFriends( p.GetFriends() );
+        player->SetName( p.GetName() );
         players.push_back( player );
         Players::Set( Color::GetIndex( p.GetColor() ), player );
     }
@@ -153,6 +155,7 @@ void Game::SavePlayers( const std::string & mapFileName, const Players & players
         player.SetRace( p->GetRace() );
         player.SetControl( p->GetControl() );
         player.SetFriends( p->GetFriends() );
+        player.SetName( p->GetName() );
         savedPlayers.push_back( player );
     }
 }
@@ -177,11 +180,11 @@ void Game::SetLastSavename( const std::string & name )
     last_name = name;
 }
 
-int Game::Credits( void )
+fheroes2::GameMode Game::Credits()
 {
     ShowCredits();
 
-    return Game::MAINMENU;
+    return fheroes2::GameMode::MAIN_MENU;
 }
 
 bool Game::ChangeMusicDisabled( void )
@@ -196,17 +199,11 @@ void Game::DisableChangeMusic( bool /*f*/ )
 
 void Game::Init( void )
 {
-    const Settings & conf = Settings::Get();
-    LocalEvent & le = LocalEvent::Get();
-
-    // update all global defines
-    if ( conf.UseAltResource() )
-        LoadExternalResource();
-
     // default events
     LocalEvent::SetStateDefaults();
 
     // set global events
+    LocalEvent & le = LocalEvent::Get();
     le.SetGlobalFilterMouseEvents( Cursor::Redraw );
     le.SetGlobalFilterKeysEvents( Game::KeyboardGlobalFilter );
     le.SetGlobalFilter( true );
@@ -229,51 +226,107 @@ void Game::SetCurrentMusic( int mus )
     current_music = mus;
 }
 
-void Game::ObjectFadeAnimation::FinishFadeTask()
+void Game::ObjectFadeAnimation::PrepareFadeTask( int object, int32_t fromIndex, int32_t toIndex, bool fadeOut, bool fadeIn )
 {
-    if ( fadeTask.object == MP2::OBJ_ZERO ) {
-        return;
-    }
-
-    if ( fadeTask.fadeOut ) {
-        Maps::Tiles & tile = world.GetTiles( fadeTask.fromIndex );
-        if ( tile.GetObject() == fadeTask.object ) {
-            tile.RemoveObjectSprite();
-            tile.SetObject( MP2::OBJ_ZERO );
-        }
-    }
-
-    if ( fadeTask.fadeIn ) {
-        Maps::Tiles & tile = world.GetTiles( fadeTask.toIndex );
-        if ( MP2::OBJ_BOAT == fadeTask.object ) {
-            tile.setBoat( Direction::RIGHT );
-        }
-    }
-
-    fadeTask.object = MP2::OBJ_ZERO;
-}
-
-void Game::ObjectFadeAnimation::StartFadeTask( uint8_t object, uint32_t fromIndex, uint32_t toIndex, bool fadeOut, bool fadeIn )
-{
-    FinishFadeTask();
-
+    const uint8_t alpha = fadeOut ? 255u : 0;
     const Maps::Tiles & fromTile = world.GetTiles( fromIndex );
-    const uint32_t alpha = fadeOut ? 255u : 0;
-    if ( MP2::OBJ_MONSTER == object ) {
+
+    if ( object == MP2::OBJ_ZERO ) {
+        fadeTask = FadeTask();
+    }
+    else if ( object == MP2::OBJ_MONSTER ) {
         const auto & spriteIndicies = Maps::Tiles::GetMonsterSpriteIndices( fromTile, fromTile.QuantityMonster().GetSpriteIndex() );
+
         fadeTask = FadeTask( object, spriteIndicies.first, spriteIndicies.second, fromIndex, toIndex, alpha, fadeOut, fadeIn, 0 );
     }
-    else if ( MP2::OBJ_BOAT == object ) {
+    else if ( object == MP2::OBJ_BOAT ) {
         fadeTask = FadeTask( object, fromTile.GetObjectSpriteIndex(), 0, fromIndex, toIndex, alpha, fadeOut, fadeIn, 0 );
     }
     else {
         const int icn = MP2::GetICNObject( object );
-        const uint32_t animationIndex = ICN::AnimationFrame( icn, fromTile.GetObjectSpriteIndex(), Game::MapsAnimationFrame(), fromTile.GetQuantity2() );
+        const uint32_t animationIndex = ICN::AnimationFrame( icn, fromTile.GetObjectSpriteIndex(), Game::MapsAnimationFrame(), fromTile.GetQuantity2() != 0 );
+
         fadeTask = FadeTask( object, fromTile.GetObjectSpriteIndex(), animationIndex, fromIndex, toIndex, alpha, fadeOut, fadeIn, fromTile.GetObjectTileset() );
     }
 }
 
-Game::ObjectFadeAnimation::FadeTask & Game::ObjectFadeAnimation::GetFadeTask()
+void Game::ObjectFadeAnimation::PerformFadeTask()
+{
+    auto removeObject = []() {
+        Maps::Tiles & tile = world.GetTiles( fadeTask.fromIndex );
+
+        if ( tile.GetObject() == fadeTask.object ) {
+            tile.RemoveObjectSprite();
+            tile.setAsEmpty();
+        }
+    };
+    auto addObject = []() {
+        Maps::Tiles & tile = world.GetTiles( fadeTask.toIndex );
+
+        if ( tile.GetObject() != fadeTask.object && fadeTask.object == MP2::OBJ_BOAT ) {
+            tile.setBoat( Direction::RIGHT );
+        }
+    };
+    auto redrawGameArea = []() {
+        fheroes2::Display & display = fheroes2::Display::instance();
+        Interface::GameArea & gameArea = Interface::Basic::Get().GetGameArea();
+
+        gameArea.Redraw( display, Interface::LEVEL_ALL );
+
+        display.render();
+    };
+
+    LocalEvent & le = LocalEvent::Get();
+
+    while ( le.HandleEvents() && ( fadeTask.fadeOut || fadeTask.fadeIn ) ) {
+        if ( Game::validateAnimationDelay( Game::HEROES_PICKUP_DELAY ) ) {
+            if ( fadeTask.fadeOut ) {
+                if ( fadeTask.alpha > 20 ) {
+                    fadeTask.alpha -= 20;
+                }
+                else {
+                    removeObject();
+
+                    if ( fadeTask.fadeIn ) {
+                        fadeTask.fadeOut = false;
+                        fadeTask.alpha = 0;
+                    }
+                    else {
+                        fadeTask = FadeTask();
+                    }
+                }
+            }
+            else if ( fadeTask.fadeIn ) {
+                if ( fadeTask.alpha == 0 ) {
+                    addObject();
+                }
+
+                if ( fadeTask.alpha < 235 ) {
+                    fadeTask.alpha += 20;
+                }
+                else {
+                    fadeTask = FadeTask();
+                }
+            }
+
+            redrawGameArea();
+        }
+    }
+
+    if ( fadeTask.fadeOut ) {
+        removeObject();
+    }
+
+    if ( fadeTask.fadeIn ) {
+        addObject();
+    }
+
+    fadeTask = FadeTask();
+
+    redrawGameArea();
+}
+
+const Game::ObjectFadeAnimation::FadeTask & Game::ObjectFadeAnimation::GetFadeTask()
 {
     return fadeTask;
 }
@@ -295,7 +348,7 @@ void Game::EnvironmentSoundMixer( void )
         return;
     }
 
-    const Point abs_pt( Interface::GetFocusCenter() );
+    const fheroes2::Point abs_pt( Interface::GetFocusCenter() );
     std::fill( reserved_vols.begin(), reserved_vols.end(), 0 );
 
     // scan 4x4 square from focus
@@ -371,43 +424,44 @@ u32 Game::GetGameOverScores( void )
 {
     const Settings & conf = Settings::Get();
 
-    u32 k_size = 0;
+    uint32_t mapSizeFactor = 0;
 
-    switch ( conf.MapsSize().w ) {
+    switch ( conf.MapsSize().width ) {
     case Maps::SMALL:
-        k_size = 140;
+        mapSizeFactor = 140;
         break;
     case Maps::MEDIUM:
-        k_size = 100;
+        mapSizeFactor = 100;
         break;
     case Maps::LARGE:
-        k_size = 80;
+        mapSizeFactor = 80;
         break;
     case Maps::XLARGE:
-        k_size = 60;
-        break;
-    default:
+        mapSizeFactor = 60;
         break;
     }
 
-    u32 flag = 0;
-    u32 nk = 0;
-    u32 end_days = world.CountDay();
+    const uint32_t daysFactor = world.CountDay() * mapSizeFactor / 100;
 
-    for ( u32 ii = 1; ii <= end_days; ++ii ) {
-        nk = ii * k_size / 100;
+    uint32_t daysScore = 0;
 
-        if ( 0 == flag && nk > 60 ) {
-            end_days = ii + ( world.CountDay() - ii ) / 2;
-            flag = 1;
-        }
-        else if ( 1 == flag && nk > 120 )
-            end_days = ii + ( world.CountDay() - ii ) / 2;
-        else if ( nk > 180 )
-            break;
+    if ( daysFactor <= 60 ) {
+        daysScore = daysFactor;
+    }
+    else if ( daysFactor <= 120 ) {
+        daysScore = daysFactor / 2 + 30;
+    }
+    else if ( daysFactor <= 360 ) {
+        daysScore = daysFactor / 4 + 60;
+    }
+    else if ( daysFactor <= 600 ) {
+        daysScore = daysFactor / 8 + 105;
+    }
+    else {
+        daysScore = 180;
     }
 
-    return GetRating() * ( 200 - nk ) / 100;
+    return GetRating() * ( 200 - daysScore ) / 100;
 }
 
 void Game::ShowMapLoadingText( void )
@@ -432,95 +486,9 @@ u32 Game::GetViewDistance( u32 d )
     return GameStatic::GetOverViewDistance( d );
 }
 
-void Game::UpdateGlobalDefines( const std::string & spec )
-{
-#ifdef WITH_XML
-    // parse profits.xml
-    TiXmlDocument doc;
-    const TiXmlElement * xml_globals = NULL;
-
-    if ( doc.LoadFile( spec.c_str() ) && NULL != ( xml_globals = doc.FirstChildElement( "globals" ) ) ) {
-        // starting_resource
-        KingdomUpdateStartingResource( xml_globals->FirstChildElement( "starting_resource" ) );
-        // view_distance
-        OverViewUpdateStatic( xml_globals->FirstChildElement( "view_distance" ) );
-        // kingdom
-        KingdomUpdateStatic( xml_globals->FirstChildElement( "kingdom" ) );
-        // game_over
-        GameOverUpdateStatic( xml_globals->FirstChildElement( "game_over" ) );
-        // whirlpool
-        WhirlpoolUpdateStatic( xml_globals->FirstChildElement( "whirlpool" ) );
-        // heroes
-        HeroesUpdateStatic( xml_globals->FirstChildElement( "heroes" ) );
-        // castle_extra_growth
-        CastleUpdateGrowth( xml_globals->FirstChildElement( "castle_extra_growth" ) );
-        // monster upgrade ratio
-        MonsterUpdateStatic( xml_globals->FirstChildElement( "monster_upgrade" ) );
-    }
-    else
-        VERBOSE_LOG( spec << ": " << doc.ErrorDesc() );
-#else
-    (void)spec;
-#endif
-}
-
 u32 Game::GetWhirlpoolPercent( void )
 {
     return GameStatic::GetLostOnWhirlpoolPercent();
-}
-
-void Game::LoadExternalResource()
-{
-    std::string spec;
-    const std::string prefix_stats = System::ConcatePath( "files", "stats" );
-
-    // globals.xml
-    spec = Settings::GetLastFile( prefix_stats, "globals.xml" );
-
-    if ( System::IsFile( spec ) )
-        Game::UpdateGlobalDefines( spec );
-
-    // monsters.xml
-    spec = Settings::GetLastFile( prefix_stats, "monsters.xml" );
-
-    if ( System::IsFile( spec ) )
-        Monster::UpdateStats( spec );
-
-    // spells.xml
-    spec = Settings::GetLastFile( prefix_stats, "spells.xml" );
-
-    if ( System::IsFile( spec ) )
-        Spell::UpdateStats( spec );
-
-    // artifacts.xml
-    spec = Settings::GetLastFile( prefix_stats, "artifacts.xml" );
-
-    if ( System::IsFile( spec ) )
-        Artifact::UpdateStats( spec );
-
-    // buildings.xml
-    spec = Settings::GetLastFile( prefix_stats, "buildings.xml" );
-
-    if ( System::IsFile( spec ) )
-        BuildingInfo::UpdateCosts( spec );
-
-    // payments.xml
-    spec = Settings::GetLastFile( prefix_stats, "payments.xml" );
-
-    if ( System::IsFile( spec ) )
-        PaymentConditions::UpdateCosts( spec );
-
-    // profits.xml
-    spec = Settings::GetLastFile( prefix_stats, "profits.xml" );
-
-    if ( System::IsFile( spec ) )
-        ProfitConditions::UpdateCosts( spec );
-
-    // skills.xml
-    spec = Settings::GetLastFile( prefix_stats, "skills.xml" );
-
-    if ( System::IsFile( spec ) )
-        Skill::UpdateStats( spec );
 }
 
 std::string Game::GetEncodeString( const std::string & str1 )

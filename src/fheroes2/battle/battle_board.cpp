@@ -40,9 +40,9 @@
 
 namespace
 {
-    int GetRandomObstaclePosition()
+    int GetRandomObstaclePosition( std::mt19937 & gen )
     {
-        return Rand::Get( 3, 6 ) + ( 11 * Rand::Get( 1, 7 ) );
+        return Rand::GetWithGen( 3, 6, gen ) + ( 11 * Rand::GetWithGen( 1, 7, gen ) );
     }
 
     bool isTwoHexObject( const int icnId )
@@ -78,21 +78,10 @@ Battle::Board::Board()
         push_back( Cell( ii ) );
 }
 
-void Battle::Board::SetArea( const Rect & area )
+void Battle::Board::SetArea( const fheroes2::Rect & area )
 {
     for ( iterator it = begin(); it != end(); ++it )
         ( *it ).SetArea( area );
-}
-
-Rect Battle::Board::GetArea( void ) const
-{
-    Rects rects;
-    rects.reserve( size() );
-
-    for ( const_iterator it = begin(); it != end(); ++it )
-        rects.push_back( ( *it ).GetPos() );
-
-    return rects.GetRect();
 }
 
 void Battle::Board::Reset( void )
@@ -107,7 +96,7 @@ void Battle::Board::Reset( void )
     }
 }
 
-void Battle::Board::SetPositionQuality( const Unit & b )
+void Battle::Board::SetPositionQuality( const Unit & b ) const
 {
     Arena * arena = GetArena();
     Units enemies( arena->GetForce( b.GetCurrentColor(), true ), true );
@@ -138,7 +127,7 @@ void Battle::Board::SetPositionQuality( const Unit & b )
     }
 }
 
-void Battle::Board::SetEnemyQuality( const Unit & unit )
+void Battle::Board::SetEnemyQuality( const Unit & unit ) const
 {
     Arena * arena = GetArena();
     Units enemies( arena->GetForce( unit.GetColor(), true ), true );
@@ -167,12 +156,21 @@ void Battle::Board::SetEnemyQuality( const Unit & unit )
 uint32_t Battle::Board::GetDistance( s32 index1, s32 index2 )
 {
     if ( isValidIndex( index1 ) && isValidIndex( index2 ) ) {
-        const int dx = std::abs( ( index1 % ARENAW ) - ( index2 % ARENAW ) );
-        const int dy = std::abs( ( index1 / ARENAW ) - ( index2 / ARENAW ) );
-        const int roundingUp = index1 / ARENAW % 2;
+        const int32_t x1 = index1 % ARENAW;
+        const int32_t y1 = index1 / ARENAW;
 
-        // hexagonal grid: you only move half as much on X axis when diagonal!
-        return static_cast<uint32_t>( dy + std::max( dx - ( dy + roundingUp ) / 2, 0 ) );
+        const int32_t x2 = index2 % ARENAW;
+        const int32_t y2 = index2 / ARENAW;
+
+        const int32_t du = y2 - y1;
+        const int32_t dv = ( x2 + y2 / 2 ) - ( x1 + y1 / 2 );
+
+        if ( ( du >= 0 && dv >= 0 ) || ( du < 0 && dv < 0 ) ) {
+            return std::max( std::abs( du ), std::abs( dv ) );
+        }
+        else {
+            return std::abs( du ) + std::abs( dv );
+        }
     }
 
     return 0;
@@ -185,9 +183,14 @@ void Battle::Board::SetScanPassability( const Unit & unit )
     at( unit.GetHeadIndex() ).SetDirection( CENTER );
 
     if ( unit.isFlying() ) {
-        for ( iterator it = begin(); it != end(); ++it )
-            if ( ( *it ).isPassable3( unit, false ) )
-                ( *it ).SetDirection( CENTER );
+        const Bridge * bridge = Arena::GetBridge();
+        const bool isPassableBridge = bridge == nullptr || bridge->isPassable( unit );
+
+        for ( std::size_t i = 0; i < size(); i++ ) {
+            if ( at( i ).isPassable3( unit, false ) && ( isPassableBridge || !Board::isBridgeIndex( static_cast<int32_t>( i ), unit ) ) ) {
+                at( i ).SetDirection( CENTER );
+            }
+        }
     }
     else {
         Indexes indexes = GetDistanceIndexes( unit.GetHeadIndex(), unit.GetSpeed() );
@@ -236,7 +239,7 @@ Battle::Indexes Battle::Board::GetAStarPath( const Unit & unit, const Position &
 
     const Bridge * bridge = Arena::GetBridge();
     const Castle * castle = Arena::GetCastle();
-    const bool isPassableBridge = bridge == nullptr || bridge->isPassable( unit.GetColor() );
+    const bool isPassableBridge = bridge == nullptr || bridge->isPassable( unit );
     const bool isMoatBuilt = castle && castle->isBuild( BUILD_MOAT );
 
     std::map<int32_t, CellNode> cellMap;
@@ -263,12 +266,12 @@ Battle::Indexes Battle::Board::GetAStarPath( const Unit & unit, const Position &
             if ( currentCellNode.parentCellId < 0 )
                 aroundCellIds = GetMoveWideIndexes( currentCellId, unit.isReflect() );
             else
-                aroundCellIds = GetMoveWideIndexes( currentCellId, ( RIGHT_SIDE & GetDirection( currentCellId, currentCellNode.parentCellId ) ) );
+                aroundCellIds = GetMoveWideIndexes( currentCellId, ( RIGHT_SIDE & GetDirection( currentCellId, currentCellNode.parentCellId ) ) != 0 );
 
             for ( const int32_t cellId : aroundCellIds ) {
                 const Cell & cell = at( cellId );
 
-                if ( cell.isPassable4( unit, center ) && ( isPassableBridge || !Board::isBridgeIndex( cellId, unit.GetColor() ) ) ) {
+                if ( cell.isPassable4( unit, center ) && ( isPassableBridge || !Board::isBridgeIndex( cellId, unit ) ) ) {
                     const bool isLeftDirection = IsLeftDirection( currentCellId, cellId, currentCellNode.leftDirection );
                     const int32_t tailCellId = isLeftDirection ? cellId + 1 : cellId - 1;
 
@@ -281,8 +284,7 @@ Battle::Indexes Battle::Board::GetAStarPath( const Unit & unit, const Position &
                     // Moat penalty. Not applied if one of the target cells is located in the moat.
                     else if ( isMoatBuilt && cellId != targetHeadCellId && cellId != targetTailCellId ) {
                         // Don't apply the moat penalty to the unit's tail if the head cell was also in the moat at the previous stage.
-                        if ( Board::isMoatIndex( cellId, unit.GetColor() )
-                             || ( Board::isMoatIndex( tailCellId, unit.GetColor() ) && !Board::isMoatIndex( currentCellId, unit.GetColor() ) ) ) {
+                        if ( Board::isMoatIndex( cellId, unit ) || ( Board::isMoatIndex( tailCellId, unit ) && !Board::isMoatIndex( currentCellId, unit ) ) ) {
                             cost += ARENASIZE;
                         }
                     }
@@ -341,11 +343,11 @@ Battle::Indexes Battle::Board::GetAStarPath( const Unit & unit, const Position &
             for ( const int32_t cellId : aroundCellIds ) {
                 const Cell & cell = at( cellId );
 
-                if ( cellMap[cellId].open && cell.isPassable4( unit, center ) && ( isPassableBridge || !Board::isBridgeIndex( cellId, unit.GetColor() ) ) ) {
+                if ( cellMap[cellId].open && cell.isPassable4( unit, center ) && ( isPassableBridge || !Board::isBridgeIndex( cellId, unit ) ) ) {
                     int32_t cost = Board::GetDistance( cellId, targetHeadCellId );
 
                     // Moat penalty. Not applied if the target cell is located in the moat.
-                    if ( isMoatBuilt && Board::isMoatIndex( cellId, unit.GetColor() ) && cellId != targetHeadCellId ) {
+                    if ( isMoatBuilt && Board::isMoatIndex( cellId, unit ) && cellId != targetHeadCellId ) {
                         cost += ARENASIZE;
                     }
 
@@ -441,7 +443,7 @@ Battle::Indexes Battle::Board::GetAStarPath( const Unit & unit, const Position &
                 if ( isWideUnit && result[i] == unit.GetTailIndex() )
                     continue;
 
-                if ( Board::isMoatIndex( result[i], unit.GetColor() ) ) {
+                if ( Board::isMoatIndex( result[i], unit ) ) {
                     result.resize( i + 1 );
                     break;
                 }
@@ -469,34 +471,6 @@ Battle::Indexes Battle::Board::GetAStarPath( const Unit & unit, const Position &
         DEBUG_LOG( DBG_BATTLE, DBG_WARN,
                    "Path is not found for " << unit.String() << ", destination: "
                                             << "(head cell ID: " << targetHeadCellId << ", tail cell ID: " << ( isWideUnit ? targetTailCellId : -1 ) << ")" );
-    }
-
-    return result;
-}
-
-Battle::Indexes Battle::Board::GetPassableQualityPositions( const Unit & b )
-{
-    Indexes result;
-    result.reserve( 30 );
-
-    // make sure we check current position first to avoid unnecessary move
-    const int headIndex = b.GetHeadIndex();
-    if ( GetCell( headIndex )->GetQuality() ) {
-        result.push_back( headIndex );
-    }
-
-    for ( const_iterator it = begin(); it != end(); ++it )
-        if ( ( *it ).isPassable3( b, false ) && ( *it ).GetQuality() )
-            result.push_back( ( *it ).GetIndex() );
-
-    if ( IS_DEBUG( DBG_BATTLE, DBG_TRACE ) ) {
-        std::stringstream ss;
-        if ( result.empty() )
-            ss << "empty";
-        else
-            for ( Indexes::const_iterator it = result.begin(); it != result.end(); ++it )
-                ss << *it << ", ";
-        DEBUG_LOG( DBG_BATTLE, DBG_TRACE, ss.str() );
     }
 
     return result;
@@ -638,6 +612,12 @@ bool Battle::Board::isNegativeDistance( s32 index1, s32 index2 )
     return ( index1 % ARENAW ) - ( index2 % ARENAW ) < 0;
 }
 
+int Battle::Board::DistanceFromOriginX( int32_t index, bool reflect )
+{
+    const int xPos = index % ARENAW;
+    return std::max( 1, reflect ? ARENAW - xPos - 1 : xPos );
+}
+
 bool Battle::Board::isValidDirection( s32 index, int dir )
 {
     if ( isValidIndex( index ) ) {
@@ -695,7 +675,7 @@ s32 Battle::Board::GetIndexDirection( s32 index, int dir )
     return -1;
 }
 
-s32 Battle::Board::GetIndexAbsPosition( const Point & pt ) const
+s32 Battle::Board::GetIndexAbsPosition( const fheroes2::Point & pt ) const
 {
     const_iterator it = begin();
 
@@ -730,14 +710,14 @@ bool Battle::Board::isImpassableIndex( s32 index )
     return !cell || !cell->isPassable1( true );
 }
 
-bool Battle::Board::isBridgeIndex( s32 index, int color )
+bool Battle::Board::isBridgeIndex( s32 index, const Unit & b )
 {
     const Bridge * bridge = Arena::GetBridge();
 
-    return ( index == 49 && bridge && bridge->isPassable( color ) ) || index == 50;
+    return ( index == 49 && !b.isFlying() && bridge && bridge->isPassable( b ) ) || index == 50;
 }
 
-bool Battle::Board::isMoatIndex( s32 index, int color )
+bool Battle::Board::isMoatIndex( s32 index, const Unit & b )
 {
     switch ( index ) {
     case 7:
@@ -751,7 +731,7 @@ bool Battle::Board::isMoatIndex( s32 index, int color )
         return true;
     case 49: {
         const Bridge * bridge = Arena::GetBridge();
-        return bridge == nullptr || !bridge->isPassable( color );
+        return b.isFlying() || bridge == nullptr || !bridge->isPassable( b );
     }
 
     default:
@@ -761,7 +741,7 @@ bool Battle::Board::isMoatIndex( s32 index, int color )
     return false;
 }
 
-void Battle::Board::SetCobjObjects( const Maps::Tiles & tile )
+void Battle::Board::SetCobjObjects( const Maps::Tiles & tile, std::mt19937 & gen )
 {
     //    bool trees = Maps::ScanAroundObject(center, MP2::OBJ_TREES).size();
     bool grave = MP2::OBJ_GRAVEYARD == tile.GetObject( false );
@@ -854,15 +834,16 @@ void Battle::Board::SetCobjObjects( const Maps::Tiles & tile )
             break;
         }
 
-    const size_t objectsToPlace = std::min( objs.size(), static_cast<size_t>( Rand::Get( 0, 4 ) ) );
-    std::random_shuffle( objs.begin(), objs.end() );
+    Rand::ShuffleWithGen( objs, gen );
+
+    const size_t objectsToPlace = std::min( objs.size(), static_cast<size_t>( Rand::GetWithGen( 0, 4, gen ) ) );
 
     for ( size_t i = 0; i < objectsToPlace; ++i ) {
         const bool checkRightCell = isTwoHexObject( objs[i] );
 
-        int32_t dest = GetRandomObstaclePosition();
+        int32_t dest = GetRandomObstaclePosition( gen );
         while ( at( dest ).GetObject() != 0 || ( checkRightCell && at( dest + 1 ).GetObject() != 0 ) ) {
-            dest = GetRandomObstaclePosition();
+            dest = GetRandomObstaclePosition( gen );
         }
 
         SetCobjObject( objs[i], dest );
@@ -886,9 +867,6 @@ void Battle::Board::SetCovrObjects( int icn )
     case ICN::COVR0007:
     case ICN::COVR0013:
     case ICN::COVR0019:
-        at( 15 ).SetObject( 0x40 );
-        at( 16 ).SetObject( 0x40 );
-        at( 17 ).SetObject( 0x40 );
         at( 25 ).SetObject( 0x40 );
         at( 26 ).SetObject( 0x40 );
         at( 27 ).SetObject( 0x40 );
@@ -909,7 +887,6 @@ void Battle::Board::SetCovrObjects( int icn )
         break;
 
     case ICN::COVR0003:
-    case ICN::COVR0009:
     case ICN::COVR0015:
     case ICN::COVR0021:
         at( 35 ).SetObject( 0x40 );
@@ -920,6 +897,16 @@ void Battle::Board::SetCovrObjects( int icn )
         at( 49 ).SetObject( 0x40 );
         at( 50 ).SetObject( 0x40 );
         at( 51 ).SetObject( 0x40 );
+        break;
+
+    case ICN::COVR0009:
+        at( 35 ).SetObject( 0x40 );
+        at( 40 ).SetObject( 0x40 );
+        at( 46 ).SetObject( 0x40 );
+        at( 47 ).SetObject( 0x40 );
+        at( 48 ).SetObject( 0x40 );
+        at( 49 ).SetObject( 0x40 );
+        at( 50 ).SetObject( 0x40 );
         break;
 
     case ICN::COVR0004:

@@ -39,23 +39,23 @@
 
 namespace
 {
-    Point GetFlagOffset( int race )
+    fheroes2::Point GetFlagOffset( int race )
     {
         switch ( race ) {
         case Race::KNGT:
-            return Point( 36, 10 );
+            return fheroes2::Point( 36, 10 );
         case Race::BARB:
-            return Point( 35, 9 );
+            return fheroes2::Point( 35, 9 );
         case Race::SORC:
-            return Point( 36, 10 );
+            return fheroes2::Point( 36, 10 );
         case Race::WRLK:
-            return Point( 34, 10 );
+            return fheroes2::Point( 34, 10 );
         case Race::WZRD:
-            return Point( 35, 9 );
+            return fheroes2::Point( 35, 9 );
         case Race::NECR:
-            return Point( 35, 10 );
+            return fheroes2::Point( 35, 10 );
         default:
-            return Point();
+            return fheroes2::Point();
         }
     }
 }
@@ -169,50 +169,6 @@ buildstats_t _builds[] = {
     {BUILD_NOTHING, Race::NONE, {0, 0, 0, 0, 0, 0, 0}},
 };
 
-void BuildingInfo::UpdateCosts( const std::string & spec )
-{
-#ifdef WITH_XML
-    // parse buildings.xml
-    TiXmlDocument doc;
-
-    if ( doc.LoadFile( spec.c_str() ) ) {
-        const TiXmlElement * xml_buildings = doc.FirstChildElement( "buildings" );
-        if ( xml_buildings != NULL ) {
-            size_t index = 0;
-
-            for ( const TiXmlElement * xml_building = xml_buildings->FirstChildElement( "building" ); xml_building && BUILD_NOTHING != _builds[index].id2;
-                  xml_building = xml_building->NextSiblingElement( "building" ), ++index ) {
-                cost_t & cost = _builds[index].cost;
-                int value;
-
-                xml_building->Attribute( "gold", &value );
-                cost.gold = value;
-                xml_building->Attribute( "wood", &value );
-                cost.wood = value;
-                xml_building->Attribute( "mercury", &value );
-                cost.mercury = value;
-                xml_building->Attribute( "ore", &value );
-                cost.ore = value;
-                xml_building->Attribute( "sulfur", &value );
-                cost.sulfur = value;
-                xml_building->Attribute( "crystal", &value );
-                cost.crystal = value;
-                xml_building->Attribute( "gems", &value );
-                cost.gems = value;
-            }
-        }
-        else {
-            VERBOSE_LOG( spec << ": " << doc.ErrorDesc() );
-        }
-    }
-    else {
-        VERBOSE_LOG( spec << ": " << doc.ErrorDesc() );
-    }
-#else
-    (void)spec;
-#endif
-}
-
 payment_t BuildingInfo::GetCost( u32 build, int race )
 {
     payment_t payment;
@@ -313,7 +269,7 @@ BuildingInfo::BuildingInfo( const Castle & c, building_t b )
     building = castle.isBuild( b ) ? castle.GetUpgradeBuilding( b ) : b;
 
     if ( BUILD_TAVERN == building && Race::NECR == castle.GetRace() )
-        building = Settings::Get().PriceLoyaltyVersion() ? BUILD_SHRINE : BUILD_TAVERN;
+        building = ( Settings::Get().isCurrentMapPriceOfLoyalty() ) ? BUILD_SHRINE : BUILD_NOTHING;
 
     bcond = castle.CheckBuyBuilding( building );
 
@@ -395,7 +351,7 @@ bool BuildingInfo::IsDwelling( void ) const
     return false;
 }
 
-void BuildingInfo::RedrawCaptain( void )
+void BuildingInfo::RedrawCaptain( void ) const
 {
     fheroes2::Display & display = fheroes2::Display::instance();
     if ( bcond == ALREADY_BUILT ) {
@@ -403,96 +359,88 @@ void BuildingInfo::RedrawCaptain( void )
         const fheroes2::Sprite & flag = fheroes2::AGG::GetICN( ICN::GetFlagIcnId( castle.GetColor() ), 0 );
 
         fheroes2::Blit( captainSprite, display, area.x, area.y );
-        Point flagOffset = GetFlagOffset( castle.GetRace() );
+        const fheroes2::Point flagOffset = GetFlagOffset( castle.GetRace() );
         fheroes2::Blit( flag, display, area.x + flagOffset.x, area.y + flagOffset.y );
     }
     else {
         fheroes2::Blit( fheroes2::AGG::GetICN( ICN::Get4Captain( castle.GetRace() ), 0 ), display, area.x, area.y );
     }
 
-    const fheroes2::Sprite & sprite_allow = fheroes2::AGG::GetICN( ICN::TOWNWIND, 11 );
-    const fheroes2::Sprite & sprite_deny = fheroes2::AGG::GetICN( ICN::TOWNWIND, 12 );
-    const fheroes2::Sprite & sprite_money = fheroes2::AGG::GetICN( ICN::TOWNWIND, 13 );
-    bool allow_buy = ( bcond == ALLOW_BUILD );
-
     // indicator
-    const fheroes2::Point dst_pt( area.x + 65, area.y + 60 );
-    if ( bcond == ALREADY_BUILT )
-        fheroes2::Blit( sprite_allow, display, dst_pt.x, dst_pt.y );
-    else if ( !allow_buy ) {
-        if ( LACK_RESOURCES == bcond )
-            fheroes2::Blit( sprite_money, display, dst_pt.x, dst_pt.y );
-        else
-            fheroes2::Blit( sprite_deny, display, dst_pt.x, dst_pt.y );
+    if ( bcond == ALREADY_BUILT ) {
+        const fheroes2::Sprite & spriteAllow = fheroes2::AGG::GetICN( ICN::TOWNWIND, 11 );
+        fheroes2::Blit( spriteAllow, display, area.x + 83 - 4 - spriteAllow.width(), area.y + 79 - 2 - spriteAllow.height() );
+    }
+    else if ( bcond != ALLOW_BUILD ) {
+        if ( LACK_RESOURCES == bcond ) {
+            const fheroes2::Sprite & spriteMoney = fheroes2::AGG::GetICN( ICN::TOWNWIND, 13 );
+            fheroes2::Blit( spriteMoney, display, area.x + 83 - 4 + 1 - spriteMoney.width(), area.y + 79 - 3 - spriteMoney.height() );
+        }
+        else {
+            const fheroes2::Sprite & spriteDeny = fheroes2::AGG::GetICN( ICN::TOWNWIND, 12 );
+            fheroes2::Blit( spriteDeny, display, area.x + 83 - 4 + 1 - spriteDeny.width(), area.y + 79 - 2 - spriteDeny.height() );
+        }
     }
 }
 
-void BuildingInfo::Redraw( void )
+void BuildingInfo::Redraw( void ) const
 {
     if ( BUILD_CAPTAIN == building ) {
         RedrawCaptain();
     }
     else {
         fheroes2::Display & display = fheroes2::Display::instance();
-        int index = GetIndexBuildingSprite( building );
+        const int index = GetIndexBuildingSprite( building );
 
+        const fheroes2::Sprite & buildingFrame = fheroes2::AGG::GetICN( ICN::BLDGXTRA, 0 );
+        fheroes2::Blit( buildingFrame, display, area.x, area.y );
         if ( BUILD_DISABLE == bcond ) {
-            const fheroes2::Sprite & infoSprite = fheroes2::AGG::GetICN( ICN::BLDGXTRA, 0 );
-            fheroes2::Blit( infoSprite, display, area.x, area.y );
-
             const fheroes2::Point offset( 6, 59 );
-            fheroes2::Sprite grayedOut = fheroes2::Crop( infoSprite, offset.x, offset.y, 125, 12 );
+            fheroes2::Sprite grayedOut = fheroes2::Crop( buildingFrame, offset.x, offset.y, 125, 12 );
             fheroes2::ApplyPalette( grayedOut, PAL::GetPalette( PAL::PaletteType::GRAY ) );
             fheroes2::ApplyPalette( grayedOut, PAL::GetPalette( PAL::PaletteType::DARKENING ) );
             fheroes2::Blit( grayedOut, display, area.x + offset.x, area.y + offset.y );
         }
-        else {
-            fheroes2::Blit( fheroes2::AGG::GetICN( ICN::BLDGXTRA, 0 ), display, area.x, area.y );
-        }
 
         // build image
-        if ( BUILD_DISABLE == bcond && BUILD_TAVERN == building ) { // skip necromancer's tavern
+        if ( BUILD_NOTHING == building ) {
             fheroes2::Blit( fheroes2::AGG::GetICN( ICN::CASLXTRA, 0 ), display, area.x, area.y );
             return;
         }
-        else {
-            fheroes2::Blit( fheroes2::AGG::GetICN( ICN::Get4Building( castle.GetRace() ), index ), display, area.x + 1, area.y + 1 );
-        }
 
-        const fheroes2::Sprite & sprite_allow = fheroes2::AGG::GetICN( ICN::TOWNWIND, 11 );
-        const fheroes2::Sprite & sprite_deny = fheroes2::AGG::GetICN( ICN::TOWNWIND, 12 );
-        const fheroes2::Sprite & sprite_money = fheroes2::AGG::GetICN( ICN::TOWNWIND, 13 );
-
-        fheroes2::Point dst_pt( area.x + 115, area.y + 40 );
+        fheroes2::Blit( fheroes2::AGG::GetICN( ICN::Get4Building( castle.GetRace() ), index ), display, area.x + 1, area.y + 1 );
 
         // indicator
-        if ( bcond == ALREADY_BUILT )
-            fheroes2::Blit( sprite_allow, display, dst_pt.x, dst_pt.y );
+        if ( bcond == ALREADY_BUILT ) {
+            const fheroes2::Sprite & spriteAllow = fheroes2::AGG::GetICN( ICN::TOWNWIND, 11 );
+            fheroes2::Blit( spriteAllow, display, area.x + buildingFrame.width() - 5 - spriteAllow.width(), area.y + 58 - 2 - spriteAllow.height() );
+        }
         else if ( bcond == BUILD_DISABLE ) {
-            fheroes2::Sprite disabledSprite( sprite_deny );
+            const fheroes2::Sprite & spriteDeny = fheroes2::AGG::GetICN( ICN::TOWNWIND, 12 );
+            fheroes2::Sprite disabledSprite( spriteDeny );
             fheroes2::ApplyPalette( disabledSprite, PAL::GetPalette( PAL::PaletteType::GRAY ) );
             fheroes2::ApplyPalette( disabledSprite, PAL::GetPalette( PAL::PaletteType::DARKENING ) );
-            fheroes2::Blit( disabledSprite, display, dst_pt.x, dst_pt.y );
+            fheroes2::Blit( disabledSprite, display, area.x + buildingFrame.width() - 5 + 1 - spriteDeny.width(), area.y + 58 - 2 - spriteDeny.height() );
         }
         else if ( bcond != ALLOW_BUILD ) {
-            if ( LACK_RESOURCES == bcond )
-                fheroes2::Blit( sprite_money, display, dst_pt.x, dst_pt.y );
-            else
-                fheroes2::Blit( sprite_deny, display, dst_pt.x, dst_pt.y );
+            if ( LACK_RESOURCES == bcond ) {
+                const fheroes2::Sprite & spriteMoney = fheroes2::AGG::GetICN( ICN::TOWNWIND, 13 );
+                fheroes2::Blit( spriteMoney, display, area.x + buildingFrame.width() - 5 + 1 - spriteMoney.width(), area.y + 58 - 3 - spriteMoney.height() );
+            }
+            else {
+                const fheroes2::Sprite & spriteDeny = fheroes2::AGG::GetICN( ICN::TOWNWIND, 12 );
+                fheroes2::Blit( spriteDeny, display, area.x + buildingFrame.width() - 5 + 1 - spriteDeny.width(), area.y + 58 - 2 - spriteDeny.height() );
+            }
         }
 
         // status bar
         if ( bcond != BUILD_DISABLE && bcond != ALREADY_BUILT ) {
-            dst_pt.x = area.x;
-            dst_pt.y = area.y + 58;
-            fheroes2::Blit( fheroes2::AGG::GetICN( ICN::CASLXTRA, bcond == ALLOW_BUILD ? 1 : 2 ), display, dst_pt.x, dst_pt.y );
+            fheroes2::Blit( fheroes2::AGG::GetICN( ICN::CASLXTRA, bcond == ALLOW_BUILD ? 1 : 2 ), display, area.x, area.y + 58 );
         }
 
         // name
-        Text text( Castle::GetStringBuilding( building, castle.GetRace() ), Font::SMALL );
-        dst_pt.x = area.x + 68 - text.w() / 2;
-        dst_pt.y = area.y + 59;
-        text.Blit( dst_pt.x, dst_pt.y );
+        const Text text( Castle::GetStringBuilding( building, castle.GetRace() ), Font::SMALL );
+        text.Blit( area.x + 68 - text.w() / 2, area.y + 59 );
     }
 }
 
@@ -501,12 +449,7 @@ const char * BuildingInfo::GetName( void ) const
     return Castle::GetStringBuilding( building, castle.GetRace() );
 }
 
-const std::string & BuildingInfo::GetDescription( void ) const
-{
-    return description;
-}
-
-bool BuildingInfo::QueueEventProcessing( fheroes2::ButtonBase & exitButton )
+bool BuildingInfo::QueueEventProcessing( fheroes2::ButtonBase & exitButton ) const
 {
     LocalEvent & le = LocalEvent::Get();
 
@@ -524,12 +467,16 @@ bool BuildingInfo::QueueEventProcessing( fheroes2::ButtonBase & exitButton )
 
 bool BuildingInfo::DialogBuyBuilding( bool buttons ) const
 {
+    if ( building == BUILD_NOTHING ) {
+        return false;
+    }
+
     fheroes2::Display & display = fheroes2::Display::instance();
 
     const int system = ( Settings::Get().ExtGameEvilInterface() ? ICN::SYSTEME : ICN::SYSTEM );
 
-    const Cursor & cursor = Cursor::Get();
-    cursor.Hide();
+    // setup cursor
+    const CursorRestorer cursorRestorer( buttons, Cursor::POINTER );
 
     std::string box1str = description;
 
@@ -566,7 +513,7 @@ bool BuildingInfo::DialogBuyBuilding( bool buttons ) const
 
     const fheroes2::Sprite & window_icons = fheroes2::AGG::GetICN( ICN::BLDGXTRA, 0 );
     const int space = 10;
-    Dialog::FrameBox box( space + window_icons.height() + space + box1.h() + space + ( isRequired ? requires_text.h() + box2.h() + space : 0 ) + rbs.GetArea().h,
+    Dialog::FrameBox box( space + window_icons.height() + space + box1.h() + space + ( isRequired ? requires_text.h() + box2.h() + space : 0 ) + rbs.GetArea().height,
                           buttons );
     const fheroes2::Rect & box_rt = box.GetArea();
     LocalEvent & le = LocalEvent::Get();
@@ -622,7 +569,6 @@ bool BuildingInfo::DialogBuyBuilding( bool buttons ) const
         button2.draw();
     }
 
-    cursor.Show();
     display.render();
 
     // message loop
@@ -666,16 +612,16 @@ std::string BuildingInfo::GetConditionDescription( void ) const
     switch ( bcond ) {
     case NOT_TODAY:
     case NEED_CASTLE:
-        res = GetBuildConditionDescription( bcond );
-        break;
+        return GetBuildConditionDescription( bcond );
 
     case BUILD_DISABLE:
         if ( building == BUILD_SHIPYARD ) {
             res = _( "Cannot build %{name} because castle is too far from water." );
             StringReplace( res, "%{name}", Castle::GetStringBuilding( BUILD_SHIPYARD, castle.GetRace() ) );
         }
-        else
+        else {
             res = "disable build.";
+        }
         break;
 
     case LACK_RESOURCES:
@@ -707,7 +653,9 @@ std::string BuildingInfo::GetConditionDescription( void ) const
 
 void BuildingInfo::SetStatusMessage( StatusBar & bar ) const
 {
-    std::string str;
+    if ( building == BUILD_NOTHING ) {
+        return;
+    }
 
     switch ( bcond ) {
     case NOT_TODAY:
@@ -717,14 +665,12 @@ void BuildingInfo::SetStatusMessage( StatusBar & bar ) const
     case LACK_RESOURCES:
     case REQUIRES_BUILD:
     case ALLOW_BUILD:
-        str = GetConditionDescription();
+        bar.ShowMessage( GetConditionDescription() );
         break;
 
     default:
         break;
     }
-
-    bar.ShowMessage( str );
 }
 
 DwellingItem::DwellingItem( const Castle & castle, u32 dw )
@@ -737,6 +683,8 @@ DwellingsBar::DwellingsBar( Castle & cstl, const fheroes2::Size & sz )
     : castle( cstl )
     , backsf( sz.width, sz.height )
 {
+    backsf.reset();
+
     for ( u32 dw = DWELLING_MONSTER1; dw <= DWELLING_MONSTER6; dw <<= 1 )
         content.emplace_back( castle, dw );
 
@@ -746,20 +694,20 @@ DwellingsBar::DwellingsBar( Castle & cstl, const fheroes2::Size & sz )
     SetItemSize( sz.width, sz.height );
 }
 
-void DwellingsBar::RedrawBackground( const Rect & pos, fheroes2::Image & dstsf )
+void DwellingsBar::RedrawBackground( const fheroes2::Rect & pos, fheroes2::Image & dstsf )
 {
     fheroes2::Blit( backsf, dstsf, pos.x, pos.y );
 }
 
-void DwellingsBar::RedrawItem( DwellingItem & dwl, const Rect & pos, fheroes2::Image & dstsf )
+void DwellingsBar::RedrawItem( DwellingItem & dwl, const fheroes2::Rect & pos, fheroes2::Image & dstsf )
 {
     const fheroes2::Sprite & mons32 = fheroes2::AGG::GetICN( ICN::MONS32, dwl.mons.GetSpriteIndex() );
-    fheroes2::Blit( mons32, dstsf, pos.x + ( pos.w - mons32.width() ) / 2, pos.y + ( pos.h - 3 - mons32.height() ) );
+    fheroes2::Blit( mons32, dstsf, pos.x + ( pos.width - mons32.width() ) / 2, pos.y + ( pos.height - 3 - mons32.height() ) );
 
     if ( castle.isBuild( dwl.type ) ) {
         // count
         Text text( std::to_string( castle.getMonstersInDwelling( dwl.type ) ), Font::SMALL );
-        text.Blit( pos.x + pos.w - text.w() - 3, pos.y + pos.h - text.h() - 1 );
+        text.Blit( pos.x + pos.width - text.w() - 3, pos.y + pos.height - text.h() - 1 );
 
         u32 grown = dwl.mons.GetGrown();
         if ( castle.isBuild( BUILD_WELL ) )
@@ -769,10 +717,10 @@ void DwellingsBar::RedrawItem( DwellingItem & dwl, const Rect & pos, fheroes2::I
 
         // grown
         text.Set( "+" + std::to_string( grown ), Font::YELLOW_SMALL );
-        text.Blit( pos.x + pos.w - text.w() - 3, pos.y + 2 );
+        text.Blit( pos.x + pos.width - text.w() - 3, pos.y + 2 );
     }
     else
-        fheroes2::Blit( fheroes2::AGG::GetICN( ICN::CSLMARKER, 0 ), dstsf, pos.x + pos.w - 10, pos.y + 4 );
+        fheroes2::Blit( fheroes2::AGG::GetICN( ICN::CSLMARKER, 0 ), dstsf, pos.x + pos.width - 10, pos.y + 4 );
 }
 
 bool DwellingsBar::ActionBarLeftMouseSingleClick( DwellingItem & dwl )

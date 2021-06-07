@@ -20,6 +20,8 @@
  *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
  ***************************************************************************/
 
+#include <algorithm>
+
 #include "localevent.h"
 #include "audio_mixer.h"
 #include "audio_music.h"
@@ -37,6 +39,183 @@ namespace
         MOD_CAPS = KMOD_CAPS,
         MOD_NUM = KMOD_NUM
     };
+
+#if defined( FHEROES2_VITA )
+    const int totalCharactersDPad = 38;
+    bool dpadInputActive = false;
+    bool currentUpper = false;
+    int currentCharIndex = 0;
+
+    const KeySym dPadKeys[totalCharactersDPad] = {
+        // lowercase letters
+        KEY_a, KEY_b, KEY_c, KEY_d, KEY_e, KEY_f, KEY_g, KEY_h, KEY_i, KEY_j, KEY_k, KEY_l, KEY_m, KEY_n, KEY_o, KEY_p, KEY_q, KEY_r, KEY_s, KEY_t, KEY_u, KEY_v, KEY_w,
+        KEY_x, KEY_y, KEY_z,
+        // space, underscore
+        KEY_SPACE, KEY_UNDERSCORE,
+        // nums
+        KEY_0, KEY_1, KEY_2, KEY_3, KEY_4, KEY_5, KEY_6, KEY_7, KEY_8, KEY_9 };
+
+    char GetCurrentDPadChar()
+    {
+        return CharFromKeySym( dPadKeys[currentCharIndex], currentUpper ? MOD_CAPS : MOD_NONE );
+    }
+
+    KeySym KeySymFromChar( char c )
+    {
+        switch ( c ) {
+        case '!':
+            return KEY_EXCLAIM;
+        case '"':
+            return KEY_QUOTEDBL;
+        case '#':
+            return KEY_HASH;
+        case '$':
+            return KEY_DOLLAR;
+        case '&':
+            return KEY_AMPERSAND;
+        case '\'':
+            return KEY_QUOTE;
+        case '(':
+            return KEY_LEFTPAREN;
+        case ')':
+            return KEY_RIGHTPAREN;
+        case '*':
+            return KEY_ASTERISK;
+        case '+':
+            return KEY_PLUS;
+        case ',':
+            return KEY_COMMA;
+        case '-':
+            return KEY_MINUS;
+        case '.':
+            return KEY_PERIOD;
+        case '/':
+            return KEY_SLASH;
+        case ':':
+            return KEY_COLON;
+        case ';':
+            return KEY_SEMICOLON;
+        case '<':
+            return KEY_LESS;
+        case '=':
+            return KEY_EQUALS;
+        case '>':
+            return KEY_GREATER;
+        case '?':
+            return KEY_QUESTION;
+        case '@':
+            return KEY_AT;
+        case '[':
+            return KEY_LEFTBRACKET;
+        case '\\':
+            return KEY_BACKSLASH;
+        case ']':
+            return KEY_RIGHTBRACKET;
+        case '^':
+            return KEY_CARET;
+        case '_':
+            return KEY_UNDERSCORE;
+        case ' ':
+            return KEY_SPACE;
+
+        case 'a':
+            return KEY_a;
+        case 'b':
+            return KEY_b;
+        case 'c':
+            return KEY_c;
+        case 'd':
+            return KEY_d;
+        case 'e':
+            return KEY_e;
+        case 'f':
+            return KEY_f;
+        case 'g':
+            return KEY_g;
+        case 'h':
+            return KEY_h;
+        case 'i':
+            return KEY_i;
+        case 'j':
+            return KEY_j;
+        case 'k':
+            return KEY_k;
+        case 'l':
+            return KEY_l;
+        case 'm':
+            return KEY_m;
+        case 'n':
+            return KEY_n;
+        case 'o':
+            return KEY_o;
+        case 'p':
+            return KEY_p;
+        case 'q':
+            return KEY_q;
+        case 'r':
+            return KEY_r;
+        case 's':
+            return KEY_s;
+        case 't':
+            return KEY_t;
+        case 'u':
+            return KEY_u;
+        case 'v':
+            return KEY_v;
+        case 'w':
+            return KEY_w;
+        case 'x':
+            return KEY_x;
+        case 'y':
+            return KEY_y;
+        case 'z':
+            return KEY_z;
+
+        case '0':
+            return KEY_0;
+        case '1':
+            return KEY_1;
+        case '2':
+            return KEY_2;
+        case '3':
+            return KEY_3;
+        case '4':
+            return KEY_4;
+        case '5':
+            return KEY_5;
+        case '6':
+            return KEY_6;
+        case '7':
+            return KEY_7;
+        case '8':
+            return KEY_8;
+        case '9':
+            return KEY_9;
+
+        default:
+            break;
+        }
+        return KEY_NONE;
+    }
+
+    void SetCurrentDPadCharIndex( char currentChar )
+    {
+        if ( currentChar >= 'A' && currentChar <= 'Z' ) {
+            currentUpper = true;
+            currentChar += 32;
+        }
+
+        const KeySym keySym = KeySymFromChar( currentChar );
+        for ( int i = 0; i < totalCharactersDPad; ++i ) {
+            if ( dPadKeys[i] == keySym ) {
+                currentCharIndex = i;
+                return;
+            }
+        }
+
+        currentCharIndex = 0;
+    }
+#endif
 }
 
 #ifdef __SWITCH__
@@ -69,10 +248,6 @@ LocalEvent::LocalEvent()
     , redraw_cursor_func( NULL )
     , keyboard_filter_func( NULL )
     , loop_delay( 1 )
-    , _isHiddenWindow( false )
-    , _isMusicPaused( false )
-    , _isSoundPaused( false )
-    , _musicVolume( 0 )
 {}
 
 #if SDL_VERSION_ATLEAST( 2, 0, 0 )
@@ -99,6 +274,7 @@ void LocalEvent::CloseController()
 
 void LocalEvent::OpenTouchpad()
 {
+#if defined( FHEROES2_VITA ) || defined( __SWITCH__ )
     const int touchNumber = SDL_GetNumTouchDevices();
     if ( touchNumber > 0 ) {
         _touchpadAvailable = true;
@@ -107,46 +283,36 @@ void LocalEvent::OpenTouchpad()
         SDL_SetHint( SDL_HINT_TOUCH_MOUSE_EVENTS, "0" );
 #endif
     }
+#endif
 }
 #endif
 
-const Point & LocalEvent::GetMousePressLeft( void ) const
+void LocalEvent::OpenVirtualKeyboard()
+{
+#if defined( FHEROES2_VITA )
+    dpadInputActive = true;
+#endif
+}
+
+void LocalEvent::CloseVirtualKeyboard()
+{
+#if defined( FHEROES2_VITA )
+    dpadInputActive = false;
+#endif
+}
+
+const fheroes2::Point & LocalEvent::GetMousePressLeft( void ) const
 {
     return mouse_pl;
 }
 
-const Point & LocalEvent::GetMousePressMiddle( void ) const
-{
-    return mouse_pm;
-}
-
-const Point & LocalEvent::GetMousePressRight( void ) const
-{
-    return mouse_pr;
-}
-
-const Point & LocalEvent::GetMouseReleaseLeft( void ) const
-{
-    return mouse_rl;
-}
-
-const Point & LocalEvent::GetMouseReleaseMiddle( void ) const
-{
-    return mouse_rm;
-}
-
-const Point & LocalEvent::GetMouseReleaseRight( void ) const
-{
-    return mouse_rr;
-}
-
-void LocalEvent::SetMouseOffsetX( int16_t x )
+void LocalEvent::SetMouseOffsetX( int32_t x )
 {
     SetModes( MOUSE_OFFSET );
     mouse_st.x = x;
 }
 
-void LocalEvent::SetMouseOffsetY( int16_t y )
+void LocalEvent::SetMouseOffsetY( int32_t y )
 {
     SetModes( MOUSE_OFFSET );
     mouse_st.y = y;
@@ -430,6 +596,10 @@ KeySym GetKeySym( int key )
         return KEY_RETURN; // repath to the normal Enter
     case SDLK_KP_EQUALS:
         return KEY_KP_EQUALS;
+    case SDLK_HOME:
+        return KEY_HOME;
+    case SDLK_END:
+        return KEY_END;
     }
 
     return KEY_NONE;
@@ -698,6 +868,99 @@ char CharFromKeySym( KeySym sym, u16 mod )
 
 size_t InsertKeySym( std::string & res, size_t pos, KeySym sym, u16 mod )
 {
+#if defined( FHEROES2_VITA )
+    (void)mod;
+
+    // input with D-Pad
+    if ( res.size() ) {
+        SetCurrentDPadCharIndex( res.back() );
+    }
+    else {
+        currentUpper = true;
+        currentCharIndex = 0;
+    }
+
+    switch ( sym ) {
+    // delete char
+    case KEY_KP4: {
+        if ( !res.empty() && pos ) {
+            res.resize( res.size() - 1 );
+            --pos;
+        }
+        break;
+    }
+    // add new char
+    case KEY_KP6: {
+        currentUpper = res.empty();
+        currentCharIndex = 0;
+
+        const char c = GetCurrentDPadChar();
+        if ( c )
+            res.push_back( c );
+
+        ++pos;
+        break;
+    }
+    // next char
+    case KEY_KP2: {
+        ++currentCharIndex;
+        if ( currentCharIndex >= totalCharactersDPad )
+            currentCharIndex = 0;
+
+        if ( !res.empty() ) {
+            res.resize( res.size() - 1 );
+        }
+        else {
+            ++pos;
+        }
+
+        const char c = GetCurrentDPadChar();
+        if ( c )
+            res.push_back( c );
+
+        break;
+    }
+    // previous char
+    case KEY_KP8: {
+        --currentCharIndex;
+        if ( currentCharIndex < 0 )
+            currentCharIndex = totalCharactersDPad - 1;
+
+        if ( !res.empty() ) {
+            res.resize( res.size() - 1 );
+        }
+        else {
+            ++pos;
+        }
+
+        const char c = GetCurrentDPadChar();
+        if ( c )
+            res.push_back( c );
+
+        break;
+    }
+    // switch uppler/lowercase
+    case KEY_SHIFT: {
+        currentUpper = !currentUpper;
+
+        if ( !res.empty() ) {
+            res.resize( res.size() - 1 );
+        }
+        else {
+            ++pos;
+        }
+
+        const char c = GetCurrentDPadChar();
+        if ( c )
+            res.push_back( c );
+
+        break;
+    }
+
+    default:
+        break;
+    }
+#else
     switch ( sym ) {
     case KEY_BACKSPACE: {
         if ( res.size() && pos ) {
@@ -723,6 +986,12 @@ size_t InsertKeySym( std::string & res, size_t pos, KeySym sym, u16 mod )
         if ( pos < res.size() )
             ++pos;
         break;
+    case KEY_HOME:
+        pos = 0;
+        break;
+    case KEY_END:
+        pos = res.size();
+        break;
 
     default: {
         char c = CharFromKeySym( sym, mod );
@@ -733,146 +1002,9 @@ size_t InsertKeySym( std::string & res, size_t pos, KeySym sym, u16 mod )
         }
     }
     }
+#endif
 
     return pos;
-}
-
-KeySym KeySymFromChar( char c )
-{
-    switch ( c ) {
-    case '!':
-        return KEY_EXCLAIM;
-    case '"':
-        return KEY_QUOTEDBL;
-    case '#':
-        return KEY_HASH;
-    case '$':
-        return KEY_DOLLAR;
-    case '&':
-        return KEY_AMPERSAND;
-    case '\'':
-        return KEY_QUOTE;
-    case '(':
-        return KEY_LEFTPAREN;
-    case ')':
-        return KEY_RIGHTPAREN;
-    case '*':
-        return KEY_ASTERISK;
-    case '+':
-        return KEY_PLUS;
-    case ',':
-        return KEY_COMMA;
-    case '-':
-        return KEY_MINUS;
-    case '.':
-        return KEY_PERIOD;
-    case '/':
-        return KEY_SLASH;
-    case ':':
-        return KEY_COLON;
-    case ';':
-        return KEY_SEMICOLON;
-    case '<':
-        return KEY_LESS;
-    case '=':
-        return KEY_EQUALS;
-    case '>':
-        return KEY_GREATER;
-    case '?':
-        return KEY_QUESTION;
-    case '@':
-        return KEY_AT;
-    case '[':
-        return KEY_LEFTBRACKET;
-    case '\\':
-        return KEY_BACKSLASH;
-    case ']':
-        return KEY_RIGHTBRACKET;
-    case '^':
-        return KEY_CARET;
-    case '_':
-        return KEY_UNDERSCORE;
-    case ' ':
-        return KEY_SPACE;
-
-    case 'a':
-        return KEY_a;
-    case 'b':
-        return KEY_b;
-    case 'c':
-        return KEY_c;
-    case 'd':
-        return KEY_d;
-    case 'e':
-        return KEY_e;
-    case 'f':
-        return KEY_f;
-    case 'g':
-        return KEY_g;
-    case 'h':
-        return KEY_h;
-    case 'i':
-        return KEY_i;
-    case 'j':
-        return KEY_j;
-    case 'k':
-        return KEY_k;
-    case 'l':
-        return KEY_l;
-    case 'm':
-        return KEY_m;
-    case 'n':
-        return KEY_n;
-    case 'o':
-        return KEY_o;
-    case 'p':
-        return KEY_p;
-    case 'q':
-        return KEY_q;
-    case 'r':
-        return KEY_r;
-    case 's':
-        return KEY_s;
-    case 't':
-        return KEY_t;
-    case 'u':
-        return KEY_u;
-    case 'v':
-        return KEY_v;
-    case 'w':
-        return KEY_w;
-    case 'x':
-        return KEY_x;
-    case 'y':
-        return KEY_y;
-    case 'z':
-        return KEY_z;
-
-    case '0':
-        return KEY_0;
-    case '1':
-        return KEY_1;
-    case '2':
-        return KEY_2;
-    case '3':
-        return KEY_3;
-    case '4':
-        return KEY_4;
-    case '5':
-        return KEY_5;
-    case '6':
-        return KEY_6;
-    case '7':
-        return KEY_7;
-    case '8':
-        return KEY_8;
-    case '9':
-        return KEY_9;
-
-    default:
-        break;
-    }
-    return KEY_NONE;
 }
 
 namespace
@@ -882,6 +1014,7 @@ namespace
     public:
         ColorCycling()
             : _counter( 0 )
+            , _isPaused( false )
             , _preRenderDrawing( nullptr )
             , _posRenderDrawing( nullptr )
         {}
@@ -908,9 +1041,9 @@ namespace
                 _posRenderDrawing();
         }
 
-        bool isRedrawRequired()
+        bool isRedrawRequired() const
         {
-            return _prevDraw.getMs() >= 220;
+            return !_isPaused && _prevDraw.getMs() >= 220;
         }
 
         void registerDrawing( void ( *preRenderDrawing )(), void ( *postRenderDrawing )() )
@@ -922,10 +1055,23 @@ namespace
                 _posRenderDrawing = postRenderDrawing;
         }
 
+        void pause()
+        {
+            _isPaused = true;
+        }
+
+        void resume()
+        {
+            _isPaused = false;
+            _prevDraw.reset();
+            _timer.reset();
+        }
+
     private:
         fheroes2::Time _timer;
         fheroes2::Time _prevDraw;
         uint32_t _counter;
+        bool _isPaused;
 
         void ( *_preRenderDrawing )();
         void ( *_posRenderDrawing )();
@@ -954,16 +1100,18 @@ LocalEvent & LocalEvent::Get( void )
 void LocalEvent::RegisterCycling( void ( *preRenderDrawing )(), void ( *postRenderDrawing )() ) const
 {
     colorCycling.registerDrawing( preRenderDrawing, postRenderDrawing );
+    colorCycling.resume();
 
     fheroes2::Display::instance().subscribe( ApplyCycling, ResetCycling );
 }
 
-void LocalEvent::PauseCycling()
+void LocalEvent::PauseCycling() const
 {
+    colorCycling.pause();
     fheroes2::Display::instance().subscribe( NULL, NULL );
 }
 
-void LocalEvent::ResumeCycling()
+void LocalEvent::ResumeCycling() const
 {
     RegisterCycling();
 }
@@ -983,7 +1131,19 @@ LocalEvent & LocalEvent::GetClean()
 bool LocalEvent::HandleEvents( bool delay, bool allowExit )
 {
     if ( colorCycling.isRedrawRequired() ) {
-        fheroes2::Display::instance().render();
+        // Looks like there is no explicit rendering so the code for color cycling was executed here.
+        if ( delay ) {
+            fheroes2::Time timeCheck;
+            fheroes2::Display::instance().render();
+
+            if ( timeCheck.getMs() > loop_delay ) {
+                // Since rendering took more than waiting time so we should not wait.
+                delay = false;
+            }
+        }
+        else {
+            fheroes2::Display::instance().render();
+        }
     }
 
     SDL_Event event;
@@ -994,7 +1154,11 @@ bool LocalEvent::HandleEvents( bool delay, bool allowExit )
 #if SDL_VERSION_ATLEAST( 2, 0, 0 )
     if ( _gameController != nullptr ) {
         // fast map scroll with dpad
+#if defined( FHEROES2_VITA )
+        if ( !_dpadScrollActive || dpadInputActive )
+#else
         if ( !_dpadScrollActive )
+#endif
             ResetModes( KEY_PRESSED );
     }
     else {
@@ -1004,7 +1168,7 @@ bool LocalEvent::HandleEvents( bool delay, bool allowExit )
     ResetModes( KEY_PRESSED );
 #endif
 
-    mouse_wm = Point();
+    mouse_wm = fheroes2::Point();
 
     while ( SDL_PollEvent( &event ) ) {
         switch ( event.type ) {
@@ -1014,17 +1178,7 @@ bool LocalEvent::HandleEvents( bool delay, bool allowExit )
             break;
 #else
         case SDL_ACTIVEEVENT:
-            if ( event.active.state & SDL_APPACTIVE ) {
-                if ( Mixer::isValid() ) {
-                    // iconify
-                    if ( 0 == event.active.gain ) {
-                        StopSounds();
-                    }
-                    else {
-                        ResumeSounds();
-                    }
-                }
-            }
+            OnActiveEvent( event );
             break;
 #endif
         // keyboard
@@ -1118,43 +1272,47 @@ bool LocalEvent::HandleEvents( bool delay, bool allowExit )
 
 void LocalEvent::StopSounds()
 {
-    _isHiddenWindow = true;
-    _isMusicPaused = Music::isPaused();
-    _isSoundPaused = Mixer::isPaused( -1 );
-    Mixer::Pause();
-    Music::Pause();
-    _musicVolume = Music::Volume( 0 );
-    loop_delay = 100;
+    Music::Mute();
+    Mixer::Mute();
 }
 
 void LocalEvent::ResumeSounds()
 {
-    if ( _isHiddenWindow ) {
-        Music::Volume( _musicVolume );
-        if ( !_isMusicPaused ) {
-            Music::Resume();
-        }
-        if ( !_isSoundPaused )
-            Mixer::Resume();
-        _isHiddenWindow = false;
-    }
-    loop_delay = 1;
+    Music::Unmute();
+    Mixer::Unmute();
 }
 
 #if SDL_VERSION_ATLEAST( 2, 0, 0 )
 void LocalEvent::OnSdl2WindowEvent( const SDL_Event & event )
 {
-    if ( !Mixer::isValid() ) {
-        return;
-    }
     if ( event.window.event == SDL_WINDOWEVENT_FOCUS_LOST ) {
         StopSounds();
     }
     else if ( event.window.event == SDL_WINDOWEVENT_FOCUS_GAINED ) {
+        // Force display rendering on app activation
+        fheroes2::Display::instance().render();
+
         ResumeSounds();
     }
 }
+#else
+void LocalEvent::OnActiveEvent( const SDL_Event & event )
+{
+    if ( event.active.state & SDL_APPINPUTFOCUS ) {
+        if ( 0 == event.active.gain ) {
+            StopSounds();
+        }
+        else {
+            // Force display rendering on app activation
+            fheroes2::Display::instance().render();
 
+            ResumeSounds();
+        }
+    }
+}
+#endif
+
+#if SDL_VERSION_ATLEAST( 2, 0, 0 )
 void LocalEvent::HandleTouchEvent( const SDL_TouchFingerEvent & event )
 {
     if ( event.touchId != 0 )
@@ -1177,8 +1335,8 @@ void LocalEvent::HandleTouchEvent( const SDL_TouchFingerEvent & event )
         _emulatedPointerPosX = (event.x * fheroes2::Display::instance().width());
         _emulatedPointerPosY = (event.y * fheroes2::Display::instance().height());
 
-        mouse_cu.x = static_cast<int16_t>( _emulatedPointerPosX );
-        mouse_cu.y = static_cast<int16_t>( _emulatedPointerPosY );
+        mouse_cu.x = static_cast<int32_t>( _emulatedPointerPosX );
+        mouse_cu.y = static_cast<int32_t>( _emulatedPointerPosY );
 
         if ( ( modes & MOUSE_MOTION ) && redraw_cursor_func ) {
             if ( modes & MOUSE_OFFSET )
@@ -1332,8 +1490,8 @@ void LocalEvent::ProcessControllerAxisMotion()
     if ( _controllerLeftXAxis != 0 || _controllerLeftYAxis != 0 ) {
         SetModes( MOUSE_MOTION );
 
-        const int16_t xSign = ( _controllerLeftXAxis > 0 ) - ( _controllerLeftXAxis < 0 );
-        const int16_t ySign = ( _controllerLeftYAxis > 0 ) - ( _controllerLeftYAxis < 0 );
+        const int32_t xSign = ( _controllerLeftXAxis > 0 ) - ( _controllerLeftXAxis < 0 );
+        const int32_t ySign = ( _controllerLeftYAxis > 0 ) - ( _controllerLeftYAxis < 0 );
 
         _emulatedPointerPosX += pow( std::abs( _controllerLeftXAxis ), CONTROLLER_AXIS_SPEEDUP ) * xSign * deltaTime * _controllerPointerSpeed;
         _emulatedPointerPosY += pow( std::abs( _controllerLeftYAxis ), CONTROLLER_AXIS_SPEEDUP ) * ySign * deltaTime * _controllerPointerSpeed;
@@ -1350,8 +1508,8 @@ void LocalEvent::ProcessControllerAxisMotion()
         else if ( _emulatedPointerPosY >= display.height() )
             _emulatedPointerPosY = display.height() - 1;
 
-        mouse_cu.x = static_cast<int16_t>( _emulatedPointerPosX );
-        mouse_cu.y = static_cast<int16_t>( _emulatedPointerPosY );
+        mouse_cu.x = static_cast<int32_t>( _emulatedPointerPosX );
+        mouse_cu.y = static_cast<int32_t>( _emulatedPointerPosY );
 
         if ( ( modes & MOUSE_MOTION ) && redraw_cursor_func ) {
             if ( modes & MOUSE_OFFSET )
@@ -1385,11 +1543,6 @@ void LocalEvent::ProcessControllerAxisMotion()
 bool LocalEvent::MouseMotion( void ) const
 {
     return ( modes & MOUSE_MOTION ) == MOUSE_MOTION;
-}
-
-bool LocalEvent::MouseMotion( const Rect & rt ) const
-{
-    return modes & MOUSE_MOTION ? rt & mouse_cu : false;
 }
 
 bool LocalEvent::MousePressLeft( void ) const
@@ -1534,6 +1687,7 @@ void LocalEvent::HandleMouseWheelEvent( const SDL_MouseWheelEvent & wheel )
 bool LocalEvent::MouseClickLeft( void )
 {
     if ( ( modes & MOUSE_CLICKED ) && SDL_BUTTON_LEFT == mouse_button ) {
+        ResetModes( MOUSE_RELEASED );
         ResetModes( MOUSE_CLICKED );
 
         return true;
@@ -1542,9 +1696,10 @@ bool LocalEvent::MouseClickLeft( void )
     return false;
 }
 
-bool LocalEvent::MouseClickLeft( const Rect & rt )
+bool LocalEvent::MouseClickLeft( const fheroes2::Rect & rt )
 {
     if ( ( modes & MOUSE_CLICKED ) && SDL_BUTTON_LEFT == mouse_button && ( rt & mouse_pl ) && ( rt & mouse_rl ) ) {
+        ResetModes( MOUSE_RELEASED );
         ResetModes( MOUSE_CLICKED );
 
         return true;
@@ -1556,6 +1711,7 @@ bool LocalEvent::MouseClickLeft( const Rect & rt )
 bool LocalEvent::MouseClickMiddle( void )
 {
     if ( ( modes & MOUSE_CLICKED ) && SDL_BUTTON_MIDDLE == mouse_button ) {
+        ResetModes( MOUSE_RELEASED );
         ResetModes( MOUSE_CLICKED );
 
         return true;
@@ -1564,9 +1720,10 @@ bool LocalEvent::MouseClickMiddle( void )
     return false;
 }
 
-bool LocalEvent::MouseClickMiddle( const Rect & rt )
+bool LocalEvent::MouseClickMiddle( const fheroes2::Rect & rt )
 {
     if ( ( modes & MOUSE_CLICKED ) && SDL_BUTTON_MIDDLE == mouse_button && ( rt & mouse_pm ) && ( rt & mouse_rm ) ) {
+        ResetModes( MOUSE_RELEASED );
         ResetModes( MOUSE_CLICKED );
 
         return true;
@@ -1578,6 +1735,7 @@ bool LocalEvent::MouseClickMiddle( const Rect & rt )
 bool LocalEvent::MouseClickRight( void )
 {
     if ( ( modes & MOUSE_CLICKED ) && SDL_BUTTON_RIGHT == mouse_button ) {
+        ResetModes( MOUSE_RELEASED );
         ResetModes( MOUSE_CLICKED );
 
         return true;
@@ -1586,9 +1744,10 @@ bool LocalEvent::MouseClickRight( void )
     return false;
 }
 
-bool LocalEvent::MouseClickRight( const Rect & rt )
+bool LocalEvent::MouseClickRight( const fheroes2::Rect & rt )
 {
     if ( ( modes & MOUSE_CLICKED ) && SDL_BUTTON_RIGHT == mouse_button && ( rt & mouse_pr ) && ( rt & mouse_rr ) ) {
+        ResetModes( MOUSE_RELEASED );
         ResetModes( MOUSE_CLICKED );
 
         return true;
@@ -1615,37 +1774,32 @@ bool LocalEvent::MouseWheelDn( void ) const
 #endif
 }
 
-bool LocalEvent::MousePressLeft( const Rect & rt ) const
+bool LocalEvent::MousePressLeft( const fheroes2::Rect & rt ) const
 {
     return MousePressLeft() && ( rt & mouse_pl );
 }
 
-bool LocalEvent::MousePressLeft( const Point & pt, u32 w, u32 h ) const
-{
-    return MousePressLeft() && ( Rect( pt.x, pt.y, w, h ) & mouse_pl );
-}
-
-bool LocalEvent::MousePressMiddle( const Rect & rt ) const
+bool LocalEvent::MousePressMiddle( const fheroes2::Rect & rt ) const
 {
     return MousePressMiddle() && ( rt & mouse_pm );
 }
 
-bool LocalEvent::MousePressRight( const Rect & rt ) const
+bool LocalEvent::MousePressRight( const fheroes2::Rect & rt ) const
 {
     return MousePressRight() && ( rt & mouse_pr );
 }
 
-bool LocalEvent::MouseReleaseLeft( const Rect & rt ) const
+bool LocalEvent::MouseReleaseLeft( const fheroes2::Rect & rt ) const
 {
     return MouseReleaseLeft() && ( rt & mouse_rl );
 }
 
-bool LocalEvent::MouseReleaseMiddle( const Rect & rt ) const
+bool LocalEvent::MouseReleaseMiddle( const fheroes2::Rect & rt ) const
 {
     return MouseReleaseMiddle() && ( rt & mouse_rm );
 }
 
-bool LocalEvent::MouseReleaseRight( const Rect & rt ) const
+bool LocalEvent::MouseReleaseRight( const fheroes2::Rect & rt ) const
 {
     return MouseReleaseRight() && ( rt & mouse_rr );
 }
@@ -1656,47 +1810,17 @@ void LocalEvent::ResetPressLeft( void )
     mouse_pl.y = -1;
 }
 
-void LocalEvent::ResetPressRight( void )
-{
-    mouse_pr.x = -1;
-    mouse_pr.y = -1;
-}
-
-void LocalEvent::ResetPressMiddle( void )
-{
-    mouse_pm.x = -1;
-    mouse_pm.y = -1;
-}
-
-void LocalEvent::ResetReleaseLeft( void )
-{
-    mouse_rl.x = -1;
-    mouse_rl.y = -1;
-}
-
-void LocalEvent::ResetReleaseRight( void )
-{
-    mouse_rr.x = -1;
-    mouse_rr.y = -1;
-}
-
-void LocalEvent::ResetReleaseMiddle( void )
-{
-    mouse_rm.x = -1;
-    mouse_rm.y = -1;
-}
-
-bool LocalEvent::MouseWheelUp( const Rect & rt ) const
+bool LocalEvent::MouseWheelUp( const fheroes2::Rect & rt ) const
 {
     return MouseWheelUp() && ( rt & mouse_cu );
 }
 
-bool LocalEvent::MouseWheelDn( const Rect & rt ) const
+bool LocalEvent::MouseWheelDn( const fheroes2::Rect & rt ) const
 {
     return MouseWheelDn() && ( rt & mouse_cu );
 }
 
-bool LocalEvent::MouseCursor( const Rect & rt ) const
+bool LocalEvent::MouseCursor( const fheroes2::Rect & rt ) const
 {
     return rt & mouse_cu;
 }
@@ -1789,6 +1913,18 @@ void LocalEvent::SetStateDefaults( void )
     SetState( SDL_JOYBALLMOTION, false );
     SetState( SDL_JOYHATMOTION, false );
     SetState( SDL_SYSWMEVENT, false );
+
+#if SDL_VERSION_ATLEAST( 2, 0, 0 )
+#if defined( FHEROES2_VITA ) || defined( __SWITCH__ )
+    SetState( SDL_FINGERDOWN, true );
+    SetState( SDL_FINGERUP, true );
+    SetState( SDL_FINGERMOTION, true );
+#else
+    SetState( SDL_FINGERDOWN, false );
+    SetState( SDL_FINGERUP, false );
+    SetState( SDL_FINGERMOTION, false );
+#endif
+#endif
 
 #if SDL_VERSION_ATLEAST( 2, 0, 0 )
     SetState( SDL_WINDOWEVENT, true );
