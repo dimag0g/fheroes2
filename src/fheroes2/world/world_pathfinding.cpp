@@ -18,10 +18,12 @@
  *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
  ***************************************************************************/
 
+#include <cmath>
 #include <set>
 
 #include "ground.h"
 #include "logging.h"
+#include "rand.h"
 #include "world.h"
 #include "world_pathfinding.h"
 
@@ -380,8 +382,22 @@ int AIWorldPathfinder::getFogDiscoveryTile( const Heroes & hero )
     for ( size_t lastProcessedNode = 0; lastProcessedNode < nodesToExplore.size(); ++lastProcessedNode ) {
         const int currentNodeIdx = nodesToExplore[lastProcessedNode];
 
-        if ( start != currentNodeIdx && Maps::getFogTileCountToBeRevealed( currentNodeIdx, scouteValue, _currentColor ) > 0 ) {
-            return currentNodeIdx;
+        if ( start != currentNodeIdx ) {
+            int32_t maxTilesToReveal = Maps::getFogTileCountToBeRevealed( currentNodeIdx, scouteValue, _currentColor );
+            if ( maxTilesToReveal > 0 ) {
+                // Found a tile where we can reveal fog. Check for other tiles in the queue to find the one with the highest value.
+                int bestIndex = currentNodeIdx;
+                for ( ; lastProcessedNode < nodesToExplore.size(); ++lastProcessedNode ) {
+                    const int nodeIdx = nodesToExplore[lastProcessedNode];
+                    const int32_t tilesToReveal = Maps::getFogTileCountToBeRevealed( nodeIdx, scouteValue, _currentColor );
+                    if ( maxTilesToReveal < tilesToReveal ) {
+                        maxTilesToReveal = tilesToReveal;
+                        bestIndex = nodeIdx;
+                    }
+                }
+
+                return bestIndex;
+            }
         }
 
         for ( size_t i = 0; i < directions.size(); ++i ) {
@@ -401,6 +417,48 @@ int AIWorldPathfinder::getFogDiscoveryTile( const Heroes & hero )
         }
     }
     return -1;
+}
+
+int AIWorldPathfinder::getNeareastTileToMove( const Heroes & hero )
+{
+    // paths have to be pre-calculated to find a spot where we're able to move
+    reEvaluateIfNeeded( hero );
+    const int start = hero.GetIndex();
+
+    Directions directions = Direction::All();
+    // We have to shuffle directions to avoid cases when heroes repeat the same steps again and again.
+    Rand::Shuffle( directions );
+
+    for ( size_t i = 0; i < directions.size(); ++i ) {
+        if ( Maps::isValidDirection( start, directions[i] ) ) {
+            const int newIndex = start + _mapOffset[i];
+            if ( newIndex == start )
+                continue;
+
+            const MapsIndexes & monsters = Maps::GetTilesUnderProtection( newIndex );
+            if ( _cache[newIndex]._cost && monsters.empty() ) {
+                return newIndex;
+            }
+        }
+    }
+    return -1;
+}
+
+bool AIWorldPathfinder::isHeroPossiblyBlockingWay( const Heroes & hero )
+{
+    // paths have to be pre-calculated to find a spot where we're able to move
+    reEvaluateIfNeeded( hero );
+    const int start = hero.GetIndex();
+
+    const bool leftSideUnreachable = !Maps::isValidDirection( start, Direction::LEFT ) || _cache[start - 1]._cost == 0;
+    const bool rightSideUnreachable = !Maps::isValidDirection( start, Direction::RIGHT ) || _cache[start + 1]._cost == 0;
+    if ( leftSideUnreachable && rightSideUnreachable ) {
+        return true;
+    }
+
+    const bool topSideUnreachable = !Maps::isValidDirection( start, Direction::TOP ) || _cache[start - world.w()]._cost == 0;
+    const bool bottomSideUnreachable = !Maps::isValidDirection( start, Direction::BOTTOM ) || _cache[start + world.w()]._cost == 0;
+    return topSideUnreachable && bottomSideUnreachable;
 }
 
 std::vector<IndexObject> AIWorldPathfinder::getObjectsOnTheWay( int targetIndex, bool checkAdjacent )

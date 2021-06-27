@@ -20,6 +20,7 @@
  *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
  ***************************************************************************/
 
+#include <algorithm>
 #include <cctype>
 #include <cstdlib>
 #include <ctime>
@@ -96,7 +97,7 @@ namespace
 int System::MakeDirectory( const std::string & path )
 {
 #if defined( __WIN32__ ) && defined( _MSC_VER )
-    return CreateDirectoryA( path.c_str(), NULL );
+    return CreateDirectoryA( path.c_str(), nullptr );
 #elif defined( __WIN32__ ) && !defined( _MSC_VER )
     return mkdir( path.c_str() );
 #elif defined( FHEROES2_VITA )
@@ -109,6 +110,17 @@ int System::MakeDirectory( const std::string & path )
 std::string System::ConcatePath( const std::string & str1, const std::string & str2 )
 {
     return std::string( str1 + SEPARATOR + str2 );
+}
+
+ListDirs System::GetOSSpecificDirectories()
+{
+    ListDirs dirs;
+
+#if defined( FHEROES2_VITA )
+    dirs.emplace_back( "ux0:app/FHOMM0002" );
+#endif
+
+    return dirs;
 }
 
 std::string System::GetConfigDirectory( const std::string & prog )
@@ -149,61 +161,6 @@ std::string System::GetDataDirectory( const std::string & prog )
 #endif
 }
 
-ListDirs System::GetDataDirectories( const std::string & prog )
-{
-    ListDirs dirs;
-
-#if defined( ANDROID )
-    const char * internal = SDL_AndroidGetInternalStoragePath();
-    if ( internal )
-        dirs.push_back( System::ConcatePath( internal, prog ) );
-
-    if ( SDL_ANDROID_EXTERNAL_STORAGE_READ && SDL_AndroidGetExternalStorageState() ) {
-        const char * external = SDL_AndroidGetExternalStoragePath();
-        if ( external )
-            dirs.push_back( System::ConcatePath( external, prog ) );
-    }
-
-    dirs.push_back( System::ConcatePath( "/storage/sdcard0", prog ) );
-    dirs.push_back( System::ConcatePath( "/storage/sdcard1", prog ) );
-#else
-    (void)prog;
-#endif
-
-    return dirs;
-}
-
-ListFiles System::GetListFiles( const std::string & prog, const std::string & prefix, const std::string & filter )
-{
-    ListFiles res;
-
-#if defined( ANDROID )
-    VERBOSE_LOG( prefix << ", " << filter );
-
-    // check assets
-    StreamFile sf;
-    if ( sf.open( "assets.list", "rb" ) ) {
-        std::list<std::string> rows = StringSplit( GetString( sf.getRaw( sf.size() ) ), "\n" );
-        for ( std::list<std::string>::const_iterator it = rows.begin(); it != rows.end(); ++it )
-            if ( prefix.empty() || ( ( prefix.size() <= ( *it ).size() && 0 == prefix.compare( ( *it ).substr( 0, prefix.size() ) ) ) ) ) {
-                if ( filter.empty() || ( 0 == filter.compare( ( *it ).substr( ( *it ).size() - filter.size(), filter.size() ) ) ) )
-                    res.push_back( *it );
-            }
-    }
-
-    ListDirs dirs = GetDataDirectories( prog );
-
-    for ( ListDirs::const_iterator it = dirs.begin(); it != dirs.end(); ++it ) {
-        res.ReadDir( prefix.size() ? System::ConcatePath( *it, prefix ) : *it, filter, false );
-    }
-#else
-    (void)prog;
-    (void)prefix;
-    (void)filter;
-#endif
-    return res;
-}
-
 std::string System::GetDirname( const std::string & str )
 {
     if ( str.size() ) {
@@ -236,6 +193,15 @@ std::string System::GetBasename( const std::string & str )
     }
 
     return str;
+}
+
+std::string System::GetUniversalBasename( const std::string & str )
+{
+    std::string path = str;
+
+    std::replace( path.begin(), path.end(), ( SEPARATOR == '/' ) ? '\\' : '/', SEPARATOR );
+
+    return GetBasename( path );
 }
 
 const char * System::GetEnvironment( const char * name )
@@ -276,11 +242,11 @@ std::string System::GetMessageLocale( int length /* 1, 2, 3 */ )
 {
     std::string locname;
 #if defined( __MINGW32__ ) || defined( _MSC_VER )
-    char * clocale = std::setlocale( LC_MONETARY, NULL );
+    char * clocale = std::setlocale( LC_MONETARY, nullptr );
 #elif defined( ANDROID ) || defined( __APPLE__ ) || defined( __clang__ )
-    char * clocale = setlocale( LC_MESSAGES, NULL );
+    char * clocale = setlocale( LC_MESSAGES, nullptr );
 #else
-    char * clocale = std::setlocale( LC_MESSAGES, NULL );
+    char * clocale = std::setlocale( LC_MESSAGES, nullptr );
 #endif
 
     if ( clocale ) {
@@ -312,7 +278,7 @@ int System::GetCommandOptions( int argc, char * const argv[], const char * optst
 char * System::GetOptionsArgument( void )
 {
 #if defined( _MSC_VER )
-    return NULL;
+    return nullptr;
 #else
     return optarg;
 #endif

@@ -44,7 +44,7 @@ In the end you should have the following directory tree on your SD card:
 [3] RUNNING
 -----------
 
-This build of Free Heroes 2 was tested on 10.2.0|AMS 0.14.4|S (FAT32). exFAT is not recommended.
+This build of Free Heroes 2 was tested on 12.0.3|AMS M.19.4|S (FAT32). exFAT is not recommended.
 Alternative controllers (keyboards, mouses, etc.) might work but weren't tested.
 
 Working controls are:
